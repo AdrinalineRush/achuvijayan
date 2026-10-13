@@ -150,6 +150,13 @@ button {
   gap: 12px;
 }
 
+.brand-symbol-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: block;
+}
+
 .brand-symbol {
   width: 32px;
   height: 32px;
