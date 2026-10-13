@@ -50,11 +50,13 @@ const FEATURE_FILMS = [
     year: "2025",
     roles: ["Editor", "VFX"],
     language: "Tamil / Malayalam",
-    badge: "Bilingual Feature",
+    badge: "Theatrical Feature",
     highlight: false,
-    poster: null,
+    poster: "assets/images/thuninthavan.jpg",
     director: "Sugeesh Dhekshinakashi & Harinarayanan K.M.",
-    description: "Dual-language suspense drama. Complete editorial assembly, narrative trimming, and visual effects compositing."
+    production: "Dhekshina Kashi Productions",
+    cast: "Indrans, Jaffer Idukki, Sudheesh, Johny Antony, Dayyana Hameed",
+    description: "Atmospheric mystery drama directed by Sugeesh Dhekshinakashi and Harinarayanan KM, inspired by real events. Full editorial assembly and rhythm design crafted by Achu Vijayan."
   },
   {
     id: "aattam",
@@ -147,10 +149,11 @@ const FEATURE_FILMS = [
     language: "Malayalam",
     badge: "Feature",
     highlight: false,
-    poster: null,
-    director: "Paulson",
-    cast: "Maqbool Salmaan",
-    description: "Narrative drama feature directed by Paulson."
+    poster: "assets/images/maffi_dona.jpg",
+    director: "Pauly Vadakkan",
+    production: "Heaven Cinemas",
+    cast: "Maqbool Salmaan, Sreevidya Nair, Jubil Rajan P. Dev",
+    description: "Youth crime and investigative drama directed by Pauly Vadakkan. Dynamic narrative editing, musical pacing, and suspense cutting executed by Achu Vijayan."
   },
   {
     id: "kidu",
@@ -160,9 +163,11 @@ const FEATURE_FILMS = [
     language: "Malayalam",
     badge: "Feature",
     highlight: false,
-    poster: null,
+    poster: "assets/images/kidu.jpg",
     director: "Majeed Abu",
-    description: "Malayalam youth drama feature exploring campus life and urban conflict."
+    production: "Pee Kay Productions",
+    cast: "Ramzan Muhammed, Minon John, Leona Lishoy, Sudhi Koppa",
+    description: "Energetic Malayalam youth and school life drama directed by Majeed Abu. Comprehensive narrative editing and pacing by Achu Vijayan."
   },
   {
     id: "white",
@@ -198,10 +203,11 @@ const FEATURE_FILMS = [
     language: "Malayalam",
     badge: "Feature",
     highlight: false,
-    poster: null,
-    director: "K. V. Bijoy",
-    cast: "Aju Varghese, Roma Asrani",
-    description: "Comedy-drama feature spanning picturesque Indonesian and Indian locations."
+    poster: "assets/images/namaste_bali.jpg",
+    director: "K. V. Bejoy",
+    production: "Minhal Productions",
+    cast: "Roma Asrani, Aju Varghese, Manoj K. Jayan",
+    description: "Comedy-drama feature spanning picturesque Bali and Kerala locations, starring Roma Asrani and Aju Varghese. Edited by Achu Vijayan."
   },
   {
     id: "ezham-suryan",
@@ -211,10 +217,11 @@ const FEATURE_FILMS = [
     language: "Malayalam",
     badge: "Early Credit",
     highlight: false,
-    poster: null,
-    director: "Njanaseelan",
-    cast: "Unni Mukundan, Mahalakshmi",
-    description: "Early career narrative feature editing credit in Malayalam cinema."
+    poster: "assets/images/ezham_suryan.jpg",
+    director: "Njanasheelan",
+    production: "Kaivalyam Creations",
+    cast: "Unni Mukundan, Mahalakshmi, Jagathy Sreekumar",
+    description: "Action-drama feature starring Unni Mukundan and Mahalakshmi. Early career feature film editing credit in Malayalam cinema."
   },
   {
     id: "second-show",
