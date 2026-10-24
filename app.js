@@ -5,13 +5,37 @@ const workMarker=document.querySelector('#work .section-top span:first-child');
 if(workMarker) workMarker.textContent='01 / UP COMING WORK';
 const featured=$('#featured');
 if(featured) featured.innerHTML=upcomingFilms.map(f=>`<button class="film-card" data-film="${f.id}"><div class="poster"><img src="${f.poster}" alt="${esc(f.title)} film poster"><span class="arrow" aria-hidden="true">↗</span></div><div class="film-meta"><span>${esc(f.roles.join(' / '))}</span><span>${f.year}</span></div><h3>${esc(f.title)}</h3></button>`).join('');
-function render(filter='all'){let count=0;document.querySelectorAll('.archive-card').forEach(card=>{const visible=filter==='all'||card.dataset.roles.includes(filter);card.hidden=!visible;if(visible)count++});$('#count').textContent=String(count).padStart(2,'0')}
+const archive=$('#archive');
+const archiveFilms=archive?[...archive.querySelectorAll('.archive-card')].map(card=>({
+  id:card.dataset.film,
+  title:card.querySelector('h3')?.textContent.trim()||'',
+  year:card.querySelector('.film-meta span')?.textContent.trim()||'',
+  roles:card.dataset.roles||'',
+  poster:card.querySelector('img')?.getAttribute('src')||'',
+  alt:card.querySelector('img')?.getAttribute('alt')||''
+})):[];
+if(archive){
+  archive.className='archive-list';
+  archive.innerHTML=archiveFilms.map((f,i)=>`<button class="archive-row" data-film="${f.id}" data-roles="${esc(f.roles)}" aria-pressed="${i===0?'true':'false'}"><span class="year">${esc(f.year)}</span><span class="title">${esc(f.title)}</span><span class="roles">${esc(f.roles.split(' ').join(' · '))}</span><span class="arrow">↗</span></button>`).join('');
+  archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-meta mono"></div><h3></h3><p>Choose a title to view its poster.</p></aside>');
+}
+const preview=$('.archive-preview');
+function showArchivePoster(id){
+  const f=archiveFilms.find(x=>x.id===id);if(!f||!preview)return;
+  preview.querySelector('img').src=f.poster;preview.querySelector('img').alt=f.alt;
+  preview.querySelector('.archive-preview-meta').textContent=`${f.year} / ${f.roles.split(' ').join(' · ')}`;
+  preview.querySelector('h3').textContent=f.title;preview.querySelector('p').textContent='Click another title to keep exploring the archive.';
+  document.querySelectorAll('.archive-row').forEach(row=>row.setAttribute('aria-pressed',String(row.dataset.film===id)));
+}
+if(archiveFilms[0])showArchivePoster(archiveFilms[0].id);
+function render(filter='all'){let count=0;document.querySelectorAll('.archive-row').forEach(row=>{const visible=filter==='all'||row.dataset.roles.includes(filter);row.hidden=!visible;if(visible)count++});$('#count').textContent=String(count).padStart(2,'0')}
 render();
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});render(b.dataset.filter)}));
 const dialog=$('#detail');let opener;
 document.addEventListener('click',e=>{
   const button=e.target.closest('[data-film],[data-campaign]');
   if(!button)return;
+  if(button.classList.contains('archive-row')){showArchivePoster(button.dataset.film);return}
   const f=button.dataset.film?FEATURE_FILMS.find(f=>f.id===button.dataset.film):AI_CAMPAIGNS.find(c=>c.id===button.dataset.campaign);
   if(!f)return;
   opener=button;
