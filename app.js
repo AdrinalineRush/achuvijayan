@@ -37,7 +37,8 @@ function showArchivePoster(id){
   preview.querySelector('.archive-preview-description').textContent=f.description;
   document.querySelectorAll('.archive-row').forEach(row=>row.setAttribute('aria-pressed',String(row.dataset.film===id)));
 }
-if(archiveFilms[0])showArchivePoster(archiveFilms[0].id);
+const defaultArchiveFilm=archiveFilms.find(f=>f.id==='vichithram')||archiveFilms[0];
+if(defaultArchiveFilm)showArchivePoster(defaultArchiveFilm.id);
 function render(filter='all'){let count=0;document.querySelectorAll('.archive-row').forEach(row=>{const visible=filter==='all'||row.dataset.roles.includes(filter);row.hidden=!visible;if(visible)count++});$('#count').textContent=String(count).padStart(2,'0')}
 render();
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});render(b.dataset.filter)}));
