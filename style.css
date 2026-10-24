@@ -27,3 +27,16 @@
 .archive-preview-languages{grid-column:2;align-self:start;color:var(--text)!important;max-width:520px!important;}
 @media(max-width:900px){.archive-row{grid-template-columns:45px minmax(0,1fr) 160px 15px}.archive-preview{grid-template-columns:minmax(190px,300px) 1fr;column-gap:24px}.archive-preview-art{min-height:320px}}
 @media(max-width:600px){.archive-row{grid-template-columns:34px minmax(0,1fr) 15px;gap:10px;padding:19px 0}.archive-row .roles{display:none}.archive-row .title{font-size:16px}.archive-preview{display:block;margin-top:32px;padding-top:25px}.archive-preview-art{min-height:300px;margin-bottom:22px}.archive-preview-art img{max-height:390px;width:auto}.archive-preview h3{font-size:27px;margin:12px 0}.archive-preview p{font-size:12px}.archive-preview-languages{margin-top:16px}}
+
+/* Keep the selected poster and its details beside the archive list. */
+.archive-browser{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.75fr);gap:64px;align-items:start;}
+.archive-browser .archive-preview{display:block;position:sticky;top:120px;margin-top:0;padding-top:0;border-top:0;}
+.archive-browser .archive-preview-art{min-height:0;height:auto;aspect-ratio:3/4;}
+.archive-browser .archive-preview-art img{max-height:none;width:100%;height:100%;object-fit:contain;}
+.archive-preview-copy{padding-top:22px;}
+.archive-browser .archive-preview h3{margin:14px 0 14px;font-size:34px;}
+.archive-browser .archive-preview p{max-width:none;margin:0 0 14px;}
+.archive-preview-description{color:var(--muted);font-size:13px;line-height:1.7;}
+.archive-browser .archive-preview-languages{grid-column:auto;color:var(--text)!important;}
+@media(max-width:900px){.archive-browser{grid-template-columns:minmax(0,1.3fr) minmax(240px,.7fr);gap:34px}.archive-browser .archive-preview h3{font-size:28px}.archive-preview-description{font-size:12px}}
+@media(max-width:600px){.archive-browser{display:block}.archive-browser .archive-preview{position:relative;top:auto;margin-top:54px;padding-top:32px;border-top:1px solid var(--line)}.archive-browser .archive-preview-art{aspect-ratio:4/5}.archive-browser .archive-preview-copy{padding-top:20px}}

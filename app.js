@@ -13,21 +13,28 @@ const archiveFilms=archive?[...archive.querySelectorAll('.archive-card')].map(ca
   roles:card.dataset.roles||'',
   poster:card.querySelector('img')?.getAttribute('src')||'',
   alt:card.querySelector('img')?.getAttribute('alt')||'',
-  languageVersions:FEATURE_FILMS.find(f=>f.id===card.dataset.film)?.languageVersions||'',
-  versionEditing:FEATURE_FILMS.find(f=>f.id===card.dataset.film)?.versionEditing||''
+  ...((feature)=>({
+    languageVersions:feature?.languageVersions||'',
+    versionEditing:feature?.versionEditing||'',
+    description:feature?.description||'',
+    director:feature?.director||'',
+    cast:feature?.cast||''
+  }))(FEATURE_FILMS.find(f=>f.id===card.dataset.film))
 })):[];
 if(archive){
   archive.className='archive-list';
   archive.innerHTML=archiveFilms.map((f,i)=>`<button class="archive-row" data-film="${f.id}" data-roles="${esc(f.roles)}" aria-pressed="${i===0?'true':'false'}"><span class="year">${esc(f.year)}</span><span class="title">${esc(f.title)}</span><span class="roles">${esc(f.roles.split(' ').join(' · '))}</span><span class="arrow">↗</span></button>`).join('');
-  archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-meta mono"></div><h3></h3><p class="archive-preview-note">Choose a title to view its poster.</p><p class="archive-preview-languages"></p></aside>');
+  archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-copy"><div class="archive-preview-meta mono"></div><h3></h3><p class="archive-preview-note">Choose a title to view its poster.</p><p class="archive-preview-languages"></p><p class="archive-preview-description"></p></div></aside>');
 }
 const preview=$('.archive-preview');
+if(archive&&preview){const browser=document.createElement('div');browser.className='archive-browser';archive.parentNode.insertBefore(browser,archive);browser.append(archive,preview)}
 function showArchivePoster(id){
   const f=archiveFilms.find(x=>x.id===id);if(!f||!preview)return;
   preview.querySelector('img').src=f.poster;preview.querySelector('img').alt=f.alt;
   preview.querySelector('.archive-preview-meta').textContent=`${f.year} / ${f.roles.split(' ').join(' · ')}`;
   preview.querySelector('h3').textContent=f.title;preview.querySelector('.archive-preview-note').textContent=f.versionEditing||'Click another title to keep exploring the archive.';
   preview.querySelector('.archive-preview-languages').textContent=f.languageVersions;
+  preview.querySelector('.archive-preview-description').textContent=f.description;
   document.querySelectorAll('.archive-row').forEach(row=>row.setAttribute('aria-pressed',String(row.dataset.film===id)));
 }
 if(archiveFilms[0])showArchivePoster(archiveFilms[0].id);
