@@ -12,19 +12,22 @@ const archiveFilms=archive?[...archive.querySelectorAll('.archive-card')].map(ca
   year:card.querySelector('.film-meta span')?.textContent.trim()||'',
   roles:card.dataset.roles||'',
   poster:card.querySelector('img')?.getAttribute('src')||'',
-  alt:card.querySelector('img')?.getAttribute('alt')||''
+  alt:card.querySelector('img')?.getAttribute('alt')||'',
+  languageVersions:FEATURE_FILMS.find(f=>f.id===card.dataset.film)?.languageVersions||'',
+  versionEditing:FEATURE_FILMS.find(f=>f.id===card.dataset.film)?.versionEditing||''
 })):[];
 if(archive){
   archive.className='archive-list';
   archive.innerHTML=archiveFilms.map((f,i)=>`<button class="archive-row" data-film="${f.id}" data-roles="${esc(f.roles)}" aria-pressed="${i===0?'true':'false'}"><span class="year">${esc(f.year)}</span><span class="title">${esc(f.title)}</span><span class="roles">${esc(f.roles.split(' ').join(' · '))}</span><span class="arrow">↗</span></button>`).join('');
-  archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-meta mono"></div><h3></h3><p>Choose a title to view its poster.</p></aside>');
+  archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-meta mono"></div><h3></h3><p class="archive-preview-note">Choose a title to view its poster.</p><p class="archive-preview-languages"></p></aside>');
 }
 const preview=$('.archive-preview');
 function showArchivePoster(id){
   const f=archiveFilms.find(x=>x.id===id);if(!f||!preview)return;
   preview.querySelector('img').src=f.poster;preview.querySelector('img').alt=f.alt;
   preview.querySelector('.archive-preview-meta').textContent=`${f.year} / ${f.roles.split(' ').join(' · ')}`;
-  preview.querySelector('h3').textContent=f.title;preview.querySelector('p').textContent='Click another title to keep exploring the archive.';
+  preview.querySelector('h3').textContent=f.title;preview.querySelector('.archive-preview-note').textContent=f.versionEditing||'Click another title to keep exploring the archive.';
+  preview.querySelector('.archive-preview-languages').textContent=f.languageVersions;
   document.querySelectorAll('.archive-row').forEach(row=>row.setAttribute('aria-pressed',String(row.dataset.film===id)));
 }
 if(archiveFilms[0])showArchivePoster(archiveFilms[0].id);
@@ -41,7 +44,7 @@ document.addEventListener('click',e=>{
   opener=button;
   const sourceImage=button.querySelector('img');
   const img=sourceImage?(sourceImage.currentSrc||sourceImage.src):(f.poster||f.image||null);
-  $('#detail-content').innerHTML=`${img?`<div class="detail-poster-wrap"><img src="${img}" alt="${esc(f.title)}"></div>`:''}<div class="detail-copy"><span class="mono">${esc(f.year)} / ${esc(f.language||f.badge)}</span><h2 id="detail-title">${esc(f.title)}</h2><p>${esc(f.description)}</p><dl>${[['Role',f.roles?.join(' / ')||f.role],['Director',f.director],['Cast',f.cast],['Production',f.production||f.client],['Awards',f.award]].filter(x=>x[1]).map(([k,v])=>`<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
+  $('#detail-content').innerHTML=`${img?`<div class="detail-poster-wrap"><img src="${img}" alt="${esc(f.title)}"></div>`:''}<div class="detail-copy"><span class="mono">${esc(f.year)} / ${esc(f.language||f.badge)}</span><h2 id="detail-title">${esc(f.title)}</h2><p>${esc(f.description)}</p><dl>${[['Role',f.roles?.join(' / ')||f.role],['Version editing',f.versionEditing],['Language versions',f.languageVersions],['Director',f.director],['Cast',f.cast],['Production',f.production||f.client],['Awards',f.award]].filter(x=>x[1]).map(([k,v])=>`<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
   const detailImage=$('#detail-content img');
   if(detailImage){
     detailImage.addEventListener('error',()=>{

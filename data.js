@@ -120,13 +120,15 @@ const FEATURE_FILMS = [
     title: "Oru Adaar Love",
     year: "2019",
     roles: ["Editor", "VFX"],
-    language: "Malayalam / Tamil",
+    language: "Malayalam / Tamil / Telugu / Kannada / Hindi",
+    languageVersions: "Malayalam — Oru Adaar Love · Tamil — Oru Adaar Love · Telugu — Lovers Day · Kannada — Kirik Love Story · Hindi — Oru Adaar Love (Hindi dubbed)",
+    versionEditing: "Edited translated versions across all five languages",
     badge: "Global Viral Hit",
     highlight: false,
     poster: "assets/images/oru_adaar_love.jpg",
     director: "Omar Lulu",
     cast: "Roshan Abdul Rahoof, Priya Prakash Varrier, Noorin Shereef",
-    description: "High-profile romantic comedy that drove one of Indian cinema's biggest global viral sensations. Edited the feature cut with dynamic musical pacing and executed visual effects."
+    description: "High-profile romantic comedy that drove one of Indian cinema's biggest global viral sensations. Edited the feature cut with dynamic musical pacing, executed visual effects, and edited the translated versions across five languages."
   },
   {
     id: "simba",
