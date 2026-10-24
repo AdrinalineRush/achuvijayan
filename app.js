@@ -1,5 +1,10 @@
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const upcomingFilms=['house-for-sale','boom-bang'].map(id=>FEATURE_FILMS.find(f=>f.id===id)).filter(Boolean);
+const workMarker=document.querySelector('#work .section-top span:first-child');
+if(workMarker) workMarker.textContent='01 / UP COMING WORK';
+const featured=$('#featured');
+if(featured) featured.innerHTML=upcomingFilms.map(f=>`<button class="film-card" data-film="${f.id}"><div class="poster"><img src="${f.poster}" alt="${esc(f.title)} film poster"><span class="arrow" aria-hidden="true">↗</span></div><div class="film-meta"><span>${esc(f.roles.join(' / '))}</span><span>${f.year}</span></div><h3>${esc(f.title)}</h3></button>`).join('');
 function render(filter='all'){let count=0;document.querySelectorAll('.archive-card').forEach(card=>{const visible=filter==='all'||card.dataset.roles.includes(filter);card.hidden=!visible;if(visible)count++});$('#count').textContent=String(count).padStart(2,'0')}
 render();
 document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});render(b.dataset.filter)}));
