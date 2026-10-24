@@ -17,6 +17,8 @@
 .archive-row[hidden]{display:none;}
 .archive-row .year,.archive-row .roles{font-size:11px;color:var(--muted);}
 .archive-row .title{font-size:19px;letter-spacing:-.4px;}
+.archive-row .title-wrap{display:flex;flex-direction:column;gap:7px;min-width:0;}
+.archive-row .title-variants{font-size:11px;line-height:1.5;color:var(--muted);max-width:720px;}
 .archive-row .arrow{color:var(--lime);font-size:18px;text-align:right;}
 .archive-preview{margin-top:44px;display:grid;grid-template-columns:minmax(230px,390px) 1fr;grid-template-rows:auto 1fr auto;column-gap:38px;align-items:end;border-top:1px solid var(--line);padding-top:36px;}
 .archive-preview-art{grid-row:1 / span 3;background:#191c16;display:flex;align-items:center;justify-content:center;min-height:390px;overflow:hidden;}

@@ -23,7 +23,7 @@ const archiveFilms=archive?[...archive.querySelectorAll('.archive-card')].map(ca
 })):[];
 if(archive){
   archive.className='archive-list';
-  archive.innerHTML=archiveFilms.map((f,i)=>`<button class="archive-row" data-film="${f.id}" data-roles="${esc(f.roles)}" aria-pressed="${i===0?'true':'false'}"><span class="year">${esc(f.year)}</span><span class="title">${esc(f.title)}</span><span class="roles">${esc(f.roles.split(' ').join(' · '))}</span><span class="arrow">↗</span></button>`).join('');
+  archive.innerHTML=archiveFilms.map((f,i)=>`<button class="archive-row" data-film="${f.id}" data-roles="${esc(f.roles)}" aria-pressed="${i===0?'true':'false'}"><span class="year">${esc(f.year)}</span><span class="title-wrap"><span class="title">${esc(f.title)}</span>${f.languageVersions?`<span class="title-variants">${esc(f.languageVersions)}</span>`:''}</span><span class="roles">${esc(f.roles.split(' ').join(' · '))}</span><span class="arrow">↗</span></button>`).join('');
   archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-copy"><div class="archive-preview-meta mono"></div><h3></h3><p class="archive-preview-note">Choose a title to view its poster.</p><p class="archive-preview-languages"></p><p class="archive-preview-description"></p></div></aside>');
 }
 const preview=$('.archive-preview');
