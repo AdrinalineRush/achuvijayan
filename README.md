@@ -1,55 +1,50 @@
 # Achu Vijayan — Personal Portfolio Website
 
-Official cinematic portfolio for **Achu Vijayan** — Film Director, Editor, Certified DaVinci Resolve Colorist, and AI Video Producer (Ernakulam, Kerala).
+Official cinematic portfolio for **Achu Vijayan** — Film Director, Editor, Producer, VFX Artist & Colorist (Kerala, India).
 
-Built as a lightweight, zero-dependency, ultra-fast static site ready to deploy directly to Vercel, Cloudflare Pages, GitHub Pages, or Firebase Hosting.
-
----
-
-## 📽️ Features & Structure
-
-* **Design Aesthetic**: Cinematic Dark & Editorial (`#0A0A0D` obsidian background, warm amber/brass `#E8A04C`, colorist teal `#3A8B8C`, Fraunces & JetBrains Mono typography).
-* **NLE Timeline Scrubber**: Real-time read-progress bar styled after a video editor playhead.
-* **Verified Filmography**: Complete filmography across 17 titles including *Vichithram* (Directorial debut), *Aattam* (Co-Producer, 3× National Film Awards), *Charles Enterprises*, *Mukundan Unni Associates*, *Boom Bang*, and *Second Show*.
-* **Dynamic Role Filtering**: Instant client-side filtering by **All / Directing / Editing / Producing / VFX**.
-* **Dual View Modes**: Interactive **Poster Grid** and **Master Filmography Table**.
-* **Film Detail Lightbox Modal**: Click any card or row to open high-res artwork, cast, director, production banner, and synopsis.
-* **AI Video & Campaigns**: Case studies for *Allwyn ("Possible is Beautiful" / The Gate Worldwide)*, *Breeze (25th Anniversary)*, *SC Banca 2.0*, and *Aistory*.
-* **Toolkit & Color Bay**: DaVinci Resolve Studio color grading workflow, ACES color management, and AI generative pipelines.
-* **SEO & Social Previews**: Clean Open Graph and Twitter Card tags with zero third-party platform branding.
+A static site with no build step, deployed on Vercel.
 
 ---
 
-## 📂 Project Structure
+## Structure
 
 ```
 AchuVijayan/
-├── index.html              # Core semantic layout & SEO metadata
-├── robots.txt              # Search engine crawling rules
-├── vercel.json             # Vercel deployment & caching headers
-├── css/
-│   └── style.css           # Complete cinematic dark design system
-├── js/
-│   ├── filmography-data.js # Verified production credits & campaign data
-│   └── main.js             # Filtering, modal lightbox, & scroll interactions
-└── assets/
-    ├── icons/
-    │   └── favicon.svg     # Anamorphic AV monogram SVG icon
-    └── images/             # Real film posters and portrait assets
+├── index.html      # Page structure, copy and SEO / social metadata
+├── style.css       # Design system, layouts, and the no-JS / reduced-motion fallback
+├── app.js          # Renders films + campaigns from data.js, archive, dialog, scroll motion
+├── data.js         # Filmography (FEATURE_FILMS) and AI campaigns (AI_CAMPAIGNS)
+├── vendor/         # GSAP 3.15 (+ ScrollTrigger, SplitText) and Lenis 1.3.26, self-hosted
+├── assets/
+│   ├── icons/      # Logo and favicons
+│   └── images/     # Portrait, film posters, campaign images
+└── vercel.json     # Headers and caching
 ```
 
----
+## The page
 
-## 🚀 Local Preview
+1. **Opening** — film-leader loader, then the name parts as the portrait frame opens to full height.
+2. **Statement** — words light up as they scroll past; a marquee follows scroll speed and direction.
+3. **01 Upcoming work** — House For Sale and Boom Bang, revealed with poster wipes and parallax.
+4. **02 The film archive** — a pinned horizontal timeline of every title (oldest → newest) under a playhead, then the filterable complete filmography with a poster preview.
+5. **03 About** — the page turns to paper.
+6. **04 Beyond the frame** — AI campaign cards that stack as you scroll.
+7. **05 Contact** — the lime panel floods in from below.
 
-Run any lightweight local server:
+Motion is skipped for visitors who prefer reduced motion; every section still reads as a static page without JavaScript.
+
+## Editing content
+
+- **Add or change a film:** edit `FEATURE_FILMS` in `data.js` (newest first). Put the poster in `assets/images/`
+  and add its pixel size to `POSTER_SIZE` in `app.js` so the timeline can lay out before images load.
+  A film with an empty `poster` gets a clapperboard slate instead.
+- **Upcoming films:** the `UPCOMING` list in `app.js`.
+- After changing `data.js`, `style.css` or `app.js`, bump the `?v=` query on its tag in `index.html`.
+
+## Local preview
 
 ```bash
-# Option 1: Python built-in server
-python3 -m http.server 3000
-
-# Option 2: Node npx serve
-npx serve .
+python3 -m http.server 4173
 ```
 
-Then open `http://localhost:3000` in your browser.
+Then open `http://localhost:4173`.

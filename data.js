@@ -45,6 +45,20 @@ const FEATURE_FILMS = [
     description: "Intense coastal investigative crime thriller written by Vishnu Ramachandran. Executed complete visual effects, digital cleanups, and screen compositing."
   },
   {
+    id: "gudiya",
+    title: "Gudiya",
+    year: "2025",
+    roles: ["Editor"],
+    language: "Hindi",
+    badge: "Music Video",
+    highlight: false,
+    poster: "assets/images/gudiya.jpg",
+    director: "Rahul PS",
+    production: "Crearn",
+    cast: "Resmi R Nair",
+    description: "Hindi romantic music video written and directed by Rahul PS and filmed in Goa — a young woman, the man who falls for her, and the bond that grows between them. Edited by Achu Vijayan."
+  },
+  {
     id: "thuninthavan",
     title: "Thuninthavan / Orumbettavan",
     year: "2025",
@@ -78,7 +92,8 @@ const FEATURE_FILMS = [
     title: "Charles Enterprises",
     year: "2023",
     roles: ["Editor", "Co-Producer", "VFX"],
-    language: "Malayalam",
+    language: "Malayalam / Tamil",
+    languageVersions: "Malayalam — Charles Enterprises · Tamil — Charles Enterprises (Tamil)",
     badge: "Theatrical & Prime Video",
     highlight: true,
     poster: "assets/images/charles_enterprises.jpg",
@@ -109,11 +124,39 @@ const FEATURE_FILMS = [
     language: "Malayalam",
     badge: "Cult Blockbuster",
     highlight: true,
-    poster: "assets/images/mukundan_unni.jpg",
+    poster: "assets/images/mukundan_unni_hd.jpg",
     director: "Abhinav Sunder Nayak",
     production: "Joy Movie Productions",
     cast: "Vineeth Sreenivasan, Suraj Venjaramoodu",
     description: "Blockbuster dark comedy crime satire co-produced under Joy Movie Productions. Achieved widespread critical acclaim and instant cult status across India."
+  },
+  {
+    id: "flip-side",
+    title: "Flip Side",
+    year: "2020",
+    roles: ["Editor"],
+    language: "English",
+    badge: "Short Film",
+    highlight: false,
+    poster: "assets/images/flip_side.jpg",
+    director: "Saju Kumar",
+    production: "Dream 2 Destiny Arts",
+    cast: "Nandha Menon, Manjusha Nair, Priyaroopan",
+    description: "English short film directed by Saju Kumar. A ten-year-old girl who always looks at the flip side of things finds her world turned upside down by a documentary about her favourite monument. Edited by Achu Vijayan."
+  },
+  {
+    id: "narai",
+    title: "Narai",
+    year: "2020",
+    roles: ["Editor"],
+    language: "Tamil",
+    badge: "Feature",
+    highlight: false,
+    poster: "assets/images/narai.jpg",
+    director: "Vivy",
+    production: "K7 Studios",
+    cast: "Sangili Murugan, Santhana Bharathi, Junior Balaiah, Nalinikanth",
+    description: "Tamil feature directed by Vivy for K7 Studios, starring Sangili Murugan, Santhana Bharathi and Junior Balaiah. Cinematography by Sinu Sidharth, music by Anirudh Vijay; edited by Achu Vijayan."
   },
   {
     id: "oru-adaar-love",
@@ -144,18 +187,18 @@ const FEATURE_FILMS = [
     description: "Inventive Tamil black comedy fantasy featuring a surreal humanized canine perspective. Editorial assembly, tempo styling, and specialized VFX."
   },
   {
-    id: "maffi-dona",
-    title: "Maffi Dona",
+    id: "maanasi",
+    title: "Maanasi",
     year: "2019",
     roles: ["Editor"],
-    language: "Malayalam",
-    badge: "Feature",
+    language: "Tamil",
+    badge: "Theatrical Feature",
     highlight: false,
-    poster: "assets/images/maffi_dona.jpg",
-    director: "Pauly Vadakkan",
-    production: "Heaven Cinemas",
-    cast: "Maqbool Salmaan, Sreevidya Nair, Jubil Rajan P. Dev",
-    description: "Youth crime and investigative drama directed by Pauly Vadakkan. Dynamic narrative editing, musical pacing, and suspense cutting executed by Achu Vijayan."
+    poster: "assets/images/maanasi.jpg",
+    director: "Navaz Suleiman",
+    production: "Movie Masons & MJ Films",
+    cast: "Naresh Madeswaran, Harissa Beegum, Kidu Aashique",
+    description: "Tamil rural drama directed by Navaz Suleiman — the story of a man and his goat. Cinematography by Kannan Patteri; edited by Achu Vijayan."
   },
   {
     id: "kidu",
@@ -226,18 +269,18 @@ const FEATURE_FILMS = [
     description: "Ambitious Malayalam road movie written by Vini Viswa Lal and directed by Albey. Filmed across 7 Indian states from New Delhi through Manali to Ladakh; edited by Achu Vijayan."
   },
   {
-    id: "ezham-suryan",
-    title: "Ezham Suryan",
-    year: "2012",
+    id: "copy-that",
+    title: "Copy That",
+    year: "2015",
     roles: ["Editor"],
-    language: "Malayalam",
-    badge: "Early Credit",
+    language: "English",
+    badge: "Short Film",
     highlight: false,
-    poster: "assets/images/ezham_suryan.jpg",
-    director: "Njanasheelan",
-    production: "Kaivalyam Creations",
-    cast: "Unni Mukundan, Mahalakshmi, Jagathy Sreekumar",
-    description: "Action-drama feature starring Unni Mukundan and Mahalakshmi. Early career feature film editing credit in Malayalam cinema."
+    poster: "assets/images/copy_that.jpg",
+    director: "Gopal Govind",
+    production: "6 People Production",
+    cast: "Peter Brandt, Gopal Govind, Dhannya Paul",
+    description: "28-minute English comedy short directed by Gopal Govind and filmed in Abu Dhabi. A down-on-his-luck copier salesman gets one last chance at the sales call of his life. Edited by Achu Vijayan."
   },
   {
     id: "second-show",
@@ -341,4 +384,16 @@ const TOOLKIT = [
     category: "AI Video Pipelines",
     items: ["ComfyUI Custom Workflows", "Kling 3.0 / Higgsfield Soul", "Runway Gen-3 / Seedance", "Consistent Character LoRAs"]
   }
+];
+
+/**
+ * TV commercials — four selected spots.
+ * Paste a YouTube or Vimeo link (unlisted Vimeo links work too), or a path to an .mp4, into `video`.
+ * `poster` is optional: YouTube links pick up their thumbnail automatically.
+ */
+const TV_COMMERCIALS = [
+  { title: "Dr. Joy's Medstore — Film 1", brand: "Dr. Joy's Medstore", year: "2023", duration: "0:48", role: "Director & Editor", video: "https://youtu.be/CgLIa42pw70", poster: "" },
+  { title: "Cathay Pacific — Student Fare", brand: "Cathay Pacific", year: "2026", duration: "1:07", role: "VFX & Editor", video: "https://youtu.be/td3I1mamYR4", poster: "" },
+  { title: "Dr. Joy's Medstore — Film 2", brand: "Dr. Joy's Medstore", year: "2023", duration: "0:42", role: "Director & Editor", video: "https://youtu.be/xxp5gB2fTbI", poster: "" },
+  { title: "Pappai Ice Cream", brand: "Pappai", year: "2017", duration: "0:30", role: "Editor", video: "https://youtu.be/VFSJlloIPgc", poster: "" }
 ];

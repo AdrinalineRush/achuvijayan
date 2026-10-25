@@ -1,66 +1,674 @@
-const $=s=>document.querySelector(s);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const upcomingFilms=['house-for-sale','boom-bang'].map(id=>FEATURE_FILMS.find(f=>f.id===id)).filter(Boolean);
-const workMarker=document.querySelector('#work .section-top span:first-child');
-if(workMarker) workMarker.textContent='01 / UP COMING WORK';
-const featured=$('#featured');
-if(featured) featured.innerHTML=upcomingFilms.map(f=>`<button class="film-card" data-film="${f.id}"><div class="poster"><img src="${f.poster}" alt="${esc(f.title)} film poster"><span class="arrow" aria-hidden="true">↗</span></div><div class="film-meta"><span>${esc(f.roles.join(' / '))}</span><span>${f.year}</span></div><h3>${esc(f.title)}</h3></button>`).join('');
-const archive=$('#archive');
-const archiveFilms=archive?[...archive.querySelectorAll('.archive-card')].map(card=>({
-  id:card.dataset.film,
-  title:card.querySelector('h3')?.textContent.trim()||'',
-  year:card.querySelector('.film-meta span')?.textContent.trim()||'',
-  roles:card.dataset.roles||'',
-  poster:card.querySelector('img')?.getAttribute('src')||'',
-  alt:card.querySelector('img')?.getAttribute('alt')||'',
-  ...((feature)=>({
-    languageVersions:feature?.languageVersions||'',
-    versionEditing:feature?.versionEditing||'',
-    description:feature?.description||'',
-    director:feature?.director||'',
-    cast:feature?.cast||''
-  }))(FEATURE_FILMS.find(f=>f.id===card.dataset.film))
-})):[];
-if(archive){
-  archive.className='archive-list';
-  archive.innerHTML=archiveFilms.map((f,i)=>`<button class="archive-row" data-film="${f.id}" data-roles="${esc(f.roles)}" aria-pressed="${i===0?'true':'false'}"><span class="year">${esc(f.year)}</span><span class="title-wrap"><span class="title">${esc(f.title)}</span>${f.languageVersions?`<span class="title-variants">${esc(f.languageVersions)}</span>`:''}</span><span class="roles">${esc(f.roles.split(' ').join(' · '))}</span><span class="arrow">↗</span></button>`).join('');
-  archive.insertAdjacentHTML('afterend','<aside class="archive-preview" aria-live="polite"><div class="archive-preview-art"><img alt=""></div><div class="archive-preview-copy"><div class="archive-preview-meta mono"></div><h3></h3><p class="archive-preview-note">Choose a title to view its poster.</p><p class="archive-preview-languages"></p><p class="archive-preview-description"></p></div></aside>');
-}
-const preview=$('.archive-preview');
-if(archive&&preview){const browser=document.createElement('div');browser.className='archive-browser';archive.parentNode.insertBefore(browser,archive);browser.append(archive,preview)}
-function showArchivePoster(id){
-  const f=archiveFilms.find(x=>x.id===id);if(!f||!preview)return;
-  preview.querySelector('img').src=f.poster;preview.querySelector('img').alt=f.alt;
-  preview.querySelector('.archive-preview-meta').textContent=`${f.year} / ${f.roles.split(' ').join(' · ')}`;
-  preview.querySelector('h3').textContent=f.title;preview.querySelector('.archive-preview-note').textContent=f.versionEditing||'Click another title to keep exploring the archive.';
-  preview.querySelector('.archive-preview-languages').textContent=f.languageVersions;
-  preview.querySelector('.archive-preview-description').textContent=f.description;
-  document.querySelectorAll('.archive-row').forEach(row=>row.setAttribute('aria-pressed',String(row.dataset.film===id)));
-}
-const defaultArchiveFilm=archiveFilms.find(f=>f.id==='vichithram')||archiveFilms[0];
-if(defaultArchiveFilm)showArchivePoster(defaultArchiveFilm.id);
-function render(filter='all'){let count=0;document.querySelectorAll('.archive-row').forEach(row=>{const visible=filter==='all'||row.dataset.roles.includes(filter);row.hidden=!visible;if(visible)count++});$('#count').textContent=String(count).padStart(2,'0')}
-render();
-document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});render(b.dataset.filter)}));
-const dialog=$('#detail');let opener;
-document.addEventListener('click',e=>{
-  const button=e.target.closest('[data-film],[data-campaign]');
-  if(!button)return;
-  if(button.classList.contains('archive-row')){showArchivePoster(button.dataset.film);return}
-  const f=button.dataset.film?FEATURE_FILMS.find(f=>f.id===button.dataset.film):AI_CAMPAIGNS.find(c=>c.id===button.dataset.campaign);
-  if(!f)return;
-  opener=button;
-  const sourceImage=button.querySelector('img');
-  const img=sourceImage?(sourceImage.currentSrc||sourceImage.src):(f.poster||f.image||null);
-  $('#detail-content').innerHTML=`${img?`<div class="detail-poster-wrap"><img src="${img}" alt="${esc(f.title)}"></div>`:''}<div class="detail-copy"><span class="mono">${esc(f.year)} / ${esc(f.language||f.badge)}</span><h2 id="detail-title">${esc(f.title)}</h2><p>${esc(f.description)}</p><dl>${[['Role',f.roles?.join(' / ')||f.role],['Version editing',f.versionEditing],['Language versions',f.languageVersions],['Director',f.director],['Cast',f.cast],['Production',f.production||f.client],['Awards',f.award]].filter(x=>x[1]).map(([k,v])=>`<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
-  const detailImage=$('#detail-content img');
-  if(detailImage){
-    detailImage.addEventListener('error',()=>{
-      detailImage.parentElement.replaceWith(Object.assign(document.createElement('p'),{className:'image-unavailable',textContent:'Poster unavailable.'}))
-    },{once:true});
+/* Achu Vijayan — portfolio behaviour.
+   Renders the film and campaign collections from data.js, runs the archive browser and the
+   detail dialog, then (unless the visitor prefers reduced motion) adds smooth scrolling and
+   the scroll-driven sequences with GSAP + ScrollTrigger + SplitText + Lenis. */
+(() => {
+  'use strict';
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const pad = n => String(n).padStart(2, '0');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const imgReady = img => !img || img.complete ? Promise.resolve() : new Promise(r => {
+    img.addEventListener('load', r, {once: true});
+    img.addEventListener('error', r, {once: true});
+  });
+  // 24 fps timecode, HH:MM:SS:FF.
+  const timecode = frames => {
+    const s = Math.floor(frames / 24);
+    return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}:${pad(frames % 24)}`;
+  };
+
+  const root = document.documentElement;
+  const films = typeof FEATURE_FILMS !== 'undefined' ? FEATURE_FILMS : [];
+  const campaigns = typeof AI_CAMPAIGNS !== 'undefined' ? AI_CAMPAIGNS : [];
+  const findFilm = id => films.find(f => f.id === id);
+
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const motion = !reducedMotion && ['gsap', 'ScrollTrigger', 'SplitText', 'Lenis'].every(n => typeof window[n] !== 'undefined');
+  const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const narrow = matchMedia('(max-width: 760px)');
+  let lenis = null;
+
+  // Intrinsic poster sizes, so the reel lays out before the images arrive.
+  const POSTER_SIZE = {
+    '32aam_adhyayam': [682, 1024], aaram: [458, 669], aattam: [702, 1024], boom_bang: [768, 1024],
+    charles_enterprises: [768, 1024], ezham_suryan: [548, 730], house_for_sale: [768, 1024], kidu: [1200, 1600],
+    maffi_dona: [715, 960], mukundan_unni: [261, 382], mukundan_unni_hd: [752, 1100], namaste_bali: [680, 859], oru_adaar_love: [768, 1024],
+    second_show: [258, 387], simba: [750, 1024], starring_pournami: [540, 720], thuninthavan: [720, 1280],
+    vichithram: [576, 1024], white: [768, 1024], gudiya: [825, 1100], flip_side: [733, 1100], copy_that: [742, 1100], maanasi: [806, 1100], narai: [215, 283]
+  };
+  const posterSize = src => POSTER_SIZE[String(src || '').split('/').pop().replace(/\.\w+$/, '')] || [3, 4];
+
+  // Titles without artwork (shorts, music videos) get a clapperboard slate in place of a poster.
+  const slate = (f, cls = '') => `<span class="slate ${cls}" role="img" aria-label="${esc(f.title)}, ${esc(f.badge || 'film')}, ${esc(f.year)}">
+      <span class="slate-bar" aria-hidden="true"></span>
+      <span class="slate-body" aria-hidden="true">
+        <span class="slate-head"><span class="mono">Prod.</span><span class="slate-title">${esc(f.title)}</span></span>
+        <span class="slate-grid">
+          <span><span class="mono">Dir.</span>${esc(f.director || '—')}</span>
+          <span><span class="mono">Year</span>${esc(f.year)}</span>
+          <span><span class="mono">Type</span>${esc(f.badge || 'Feature')}</span>
+          <span><span class="mono">Role</span>${esc(f.roles.join(' / '))}</span>
+        </span>
+      </span>
+    </span>`;
+
+  let refreshTimer;
+  const refresh = () => {
+    if (!motion) return;
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => ScrollTrigger.refresh(), 120);
+  };
+
+  /* ---------- Upcoming work: a release sheet per film ---------- */
+  const UPCOMING = ['house-for-sale', 'boom-bang'];
+  const upcomingEl = $('#upcoming');
+  if (upcomingEl) upcomingEl.innerHTML = UPCOMING.map(findFilm).filter(Boolean).map((f, i, all) => {
+    const [w, h] = posterSize(f.poster);
+    const facts = [['Role', f.roles.join(' / ')], ['Language', f.language], ['Director', f.director], ['Production', f.production], ['Cast', f.cast]].filter(x => x[1]);
+    return `<article class="feature">
+      <button class="feature-media" type="button" data-film="${f.id}" data-cursor="View" aria-label="View details: ${esc(f.title)}">
+        <span class="feature-clip"><span class="feature-zoom"><img src="${f.poster}" alt="${esc(f.title)} film poster" width="${w}" height="${h}" loading="lazy" decoding="async"></span></span>
+      </button>
+      <div class="feature-copy">
+        <div class="feature-top mono"><span>${pad(i + 1)} / ${pad(all.length)}</span><span class="feature-status"><i></i>${esc(f.badge)}</span><span>${esc(f.year)}</span></div>
+        <h3 class="feature-title">${esc(f.title)}</h3>
+        <p class="feature-desc">${esc(f.description)}</p>
+        <dl class="feature-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+        <button class="pill feature-more" type="button" data-film="${f.id}">Full credits <span aria-hidden="true">↗</span></button>
+      </div>
+    </article>`;
+  }).join('');
+
+  /* ---------- Film archive reel: oldest to newest, like clips on a timeline ---------- */
+  const chrono = [...films].reverse();
+  const track = $('#reel-track');
+  const viewport = $('#reel-viewport');
+  if (track) track.innerHTML = chrono.map((f, i) => {
+    const [w, h] = posterSize(f.poster);
+    return `<button class="reel-clip" type="button" data-film="${f.id}" data-index="${i}" data-cursor="Open" aria-label="${esc(f.title)}, ${esc(f.year)}">
+      <span class="reel-clip-head mono" aria-hidden="true"><span>${esc(f.year)}</span><span>${pad(i + 1)}</span></span>
+      ${f.poster ? `<img class="reel-media" src="${f.poster}" alt="" width="${w}" height="${h}" loading="lazy" decoding="async">` : slate(f, 'reel-media')}
+    </button>`;
+  }).join('');
+  const reelClips = $$('.reel-clip');
+  $$('[data-film-count]').forEach(el => { el.textContent = films.length; });
+  if ($('#reel-total')) $('#reel-total').textContent = pad(chrono.length);
+  if (chrono.length && $('#reel-span')) $('#reel-span').textContent = `${chrono[0].year} — ${chrono.at(-1).year}`;
+
+  let activeIndex = -1;
+  function setActive(i) {
+    if (i === activeIndex || !chrono[i]) return;
+    activeIndex = i;
+    reelClips.forEach((c, n) => c.classList.toggle('is-active', n === i));
+    const f = chrono[i];
+    const title = $('#reel-active-title'), meta = $('#reel-active-meta'), desc = $('#reel-active-desc');
+    $('#reel-year').textContent = f.year;
+    $('#reel-index').textContent = pad(i + 1);
+    title.textContent = f.title;
+    meta.textContent = [f.roles.join(' · '), f.language].filter(Boolean).join(' — ');
+    desc.textContent = f.description || '';
+    if (motion) gsap.fromTo([title, meta, desc], {yPercent: 35, autoAlpha: 0}, {yPercent: 0, autoAlpha: 1, duration: .45, ease: 'power3.out', stagger: .04, overwrite: true});
   }
-  $('#detail-content').classList.toggle('without-poster',!img);
-  dialog.showModal();
-  document.body.style.overflow='hidden';
-});
-$('#close').addEventListener('click',()=>dialog.close());dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close()}});dialog.addEventListener('close',()=>{document.body.style.overflow='';opener?.focus()});
+
+  // Pad the track so the first and last posters can sit under the centred playhead.
+  let clipCenters = [];
+  function measureReel() {
+    if (!track || !reelClips.length) return;
+    const W = viewport.clientWidth;
+    track.style.paddingLeft = `${W / 2 - reelClips[0].offsetWidth / 2}px`;
+    track.style.paddingRight = `${W / 2 - reelClips.at(-1).offsetWidth / 2}px`;
+    clipCenters = reelClips.map(c => c.offsetLeft + c.offsetWidth / 2);
+  }
+  const nearestClip = x => clipCenters.reduce((best, c, i) => Math.abs(c - x) < Math.abs(clipCenters[best] - x) ? i : best, 0);
+
+  // Phones, short screens and reduced motion: a native swipeable strip.
+  function nativeReel() {
+    if (!viewport) return () => {};
+    measureReel();
+    const onScroll = () => setActive(nearestClip(viewport.scrollLeft + viewport.clientWidth / 2));
+    const onResize = () => { measureReel(); onScroll(); };
+    viewport.addEventListener('scroll', onScroll, {passive: true});
+    addEventListener('resize', onResize);
+    onScroll();
+    return () => {
+      viewport.removeEventListener('scroll', onScroll);
+      removeEventListener('resize', onResize);
+    };
+  }
+  $('#reel-open')?.addEventListener('click', e => openDetail(chrono[activeIndex], e.currentTarget));
+
+  /* ---------- Complete filmography: list + poster preview ---------- */
+  const list = $('#archive-list');
+  const preview = $('.archive-preview');
+  const browser = $('.archive-browser');
+  if (list) list.innerHTML = films.map(f => `<button class="archive-row" type="button" data-film="${f.id}" data-roles="${esc(f.roles.join(' '))}" aria-pressed="false">
+      <span class="year mono">${esc(f.year)}</span>
+      <span class="title-wrap"><span class="title">${esc(f.title)}</span>${f.languageVersions ? `<span class="title-variants">${esc(f.languageVersions)}</span>` : ''}</span>
+      <span class="roles mono">${esc(f.roles.join(' · '))}</span>
+      <span class="arrow" aria-hidden="true">↗</span>
+    </button>`).join('');
+  const rows = $$('.archive-row');
+
+  let previewId = null;
+  function showPreview(id, animate) {
+    const f = findFilm(id);
+    if (!f || !preview) return;
+    previewId = id;
+    const art = $('.archive-preview-art', preview);
+    const [w, h] = posterSize(f.poster);
+    art.innerHTML = f.poster ? `<img src="${f.poster}" alt="${esc(f.title)} poster" width="${w}" height="${h}">` : slate(f);
+    const media = art.firstElementChild;
+    $('.archive-preview-meta', preview).textContent = `${f.year} / ${f.roles.join(' · ')}`;
+    $('h3', preview).textContent = f.title;
+    $('.archive-preview-note', preview).textContent = f.versionEditing || '';
+    $('.archive-preview-languages', preview).textContent = f.languageVersions || '';
+    $('.archive-preview-description', preview).textContent = f.description || '';
+    rows.forEach(r => r.setAttribute('aria-pressed', String(r.dataset.film === id)));
+    if (animate && motion) {
+      gsap.fromTo(media, {clipPath: 'inset(0% 0% 100% 0%)', scale: 1.08}, {clipPath: 'inset(0% 0% 0% 0%)', scale: 1, duration: .9, ease: 'expo.out', overwrite: true});
+      gsap.fromTo($$('.archive-preview-copy > *', preview), {y: 14, autoAlpha: 0}, {y: 0, autoAlpha: 1, duration: .6, ease: 'power3.out', stagger: .04, overwrite: true});
+    }
+  }
+
+  // On a phone the preview opens directly under the chosen row.
+  function placePreview(row) {
+    if (!preview || !browser) return;
+    if (narrow.matches && row) row.after(preview);
+    else if (!narrow.matches && preview.parentElement !== browser) browser.append(preview);
+  }
+  narrow.addEventListener('change', () => { placePreview(null); refresh(); });
+
+  function applyFilter(filter, animate) {
+    let count = 0;
+    rows.forEach(r => {
+      const show = filter === 'all' || r.dataset.roles.includes(filter);
+      r.hidden = !show;
+      if (show) count++;
+    });
+    $('#count').textContent = pad(count);
+    if (animate && motion) gsap.fromTo(rows.filter(r => !r.hidden), {autoAlpha: 0, y: 16}, {autoAlpha: 1, y: 0, duration: .5, ease: 'power3.out', stagger: .03, overwrite: true});
+    if (animate) refresh();
+  }
+  $$('[data-filter]').forEach(b => b.addEventListener('click', () => {
+    $$('[data-filter]').forEach(x => {
+      x.classList.toggle('active', x === b);
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    applyFilter(b.dataset.filter, true);
+  }));
+
+  const defaultFilm = findFilm('vichithram') || films[0];
+  if (defaultFilm) showPreview(defaultFilm.id, false);
+  applyFilter('all', false);
+
+  /* ---------- TV commercials: four click-to-play players ---------- */
+  const spots = typeof TV_COMMERCIALS !== 'undefined' ? TV_COMMERCIALS : [];
+  // Accepts YouTube (watch / youtu.be / shorts / embed), Vimeo (incl. unlisted hash) or a direct video file.
+  const parseVideo = url => {
+    const u = String(url || '').trim();
+    let m;
+    if ((m = u.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/))) return {type: 'youtube', id: m[1], thumb: `https://i.ytimg.com/vi/${m[1]}/maxresdefault.jpg`, fallback: `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`};
+    if ((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)(?:\/([\da-f]+))?/))) return {type: 'vimeo', id: m[1], hash: m[2]};
+    if (/\.(mp4|webm|mov)(\?|#|$)/i.test(u)) return {type: 'file', src: u};
+    return null;
+  };
+  const tvcGrid = $('#tvc-grid');
+  if (tvcGrid) tvcGrid.innerHTML = spots.map((c, i) => {
+    const v = parseVideo(c.video);
+    const poster = c.poster || v?.thumb || '';
+    const title = c.title || 'Title to come';
+    const tag = `<span class="spot-tag mono">${pad(i + 1)} / ${pad(spots.length)}</span>`;
+    const fallback = !c.poster && v?.fallback ? ` data-fallback="${v.fallback}"` : '';
+    const art = poster ? `<img class="spot-poster" src="${esc(poster)}" alt="" loading="lazy" decoding="async"${fallback}>` : '<span class="spot-placeholder" aria-hidden="true"></span>';
+    const face = v
+      ? `<button class="spot-play" type="button" data-spot="${i}" data-cursor="Play" aria-label="Play ${esc(title)}">${art}${tag}<span class="spot-btn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></svg></span></button>`
+      : `<div class="spot-play is-empty">${art}${tag}<span class="spot-empty mono">Video link to come</span></div>`;
+    return `<article class="spot" data-index="${i}">
+      <div class="spot-player">${face}</div>
+      <div class="spot-info">
+        <span class="spot-meta mono">${esc([c.year, c.duration].filter(Boolean).join(' · ') || 'TV commercial')}</span>
+        <h3 class="spot-title">${esc(title)}</h3>
+        ${c.role ? `<span class="spot-role mono">${esc(c.role)}</span>` : ''}
+      </div>
+    </article>`;
+  }).join('');
+
+  // YouTube answers a missing HD thumbnail with a 120px grey placeholder rather than an error,
+  // so fall back to the standard thumbnail in either case.
+  $$('.spot-poster[data-fallback]').forEach(img => {
+    const swap = () => { if (img.dataset.fallback) { img.src = img.dataset.fallback; delete img.dataset.fallback; } };
+    img.addEventListener('error', swap);
+    img.addEventListener('load', () => { if (img.naturalWidth < 200) swap(); });
+    if (img.complete && img.naturalWidth && img.naturalWidth < 200) swap();
+  });
+
+  // The real player is only created on play, so the page never loads four video embeds up front.
+  let playing = null;
+  function stopSpot() {
+    if (!playing) return;
+    playing.frame.remove();
+    playing.face.hidden = false;
+    playing = null;
+  }
+  function playSpot(i) {
+    const c = spots[i], v = parseVideo(c?.video);
+    const face = $(`.spot[data-index="${i}"] .spot-play`);
+    if (!v || !face) return;
+    stopSpot();
+    let frame;
+    if (v.type === 'file') {
+      frame = Object.assign(document.createElement('video'), {src: v.src, controls: true, autoplay: true, playsInline: true});
+      if (c.poster) frame.poster = c.poster;
+    } else {
+      frame = document.createElement('iframe');
+      frame.src = v.type === 'youtube'
+        ? `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+        : `https://player.vimeo.com/video/${v.id}?autoplay=1&title=0&byline=0&portrait=0${v.hash ? `&h=${v.hash}` : ''}`;
+      frame.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+      frame.allowFullscreen = true;
+      frame.title = c.title || 'TV commercial';
+    }
+    frame.className = 'spot-frame';
+    face.hidden = true;
+    face.parentElement.append(frame);
+    playing = {frame, face};
+    hideCursor();
+    frame.focus?.();
+  }
+  document.addEventListener('click', e => {
+    const play = e.target.closest('.spot-play[data-spot]');
+    if (play) playSpot(+play.dataset.spot);
+  });
+
+  /* ---------- Beyond the frame: campaign cards ---------- */
+  const stack = $('#campaigns');
+  if (stack) stack.innerHTML = campaigns.map((c, i) => `<article class="stack-card" style="--i:${i}">
+      <div class="stack-inner">
+        <div class="stack-media"><img src="${c.image}" alt="${esc(c.title)}" loading="lazy" decoding="async"></div>
+        <div class="stack-copy">
+          <div class="stack-top mono"><span>${pad(i + 1)} / ${pad(campaigns.length)}</span><span>${esc(c.badge)}</span></div>
+          <h3>${esc(c.title)}</h3>
+          <p>${esc(c.description)}</p>
+          <dl><dt>Role</dt><dd>${esc(c.role)}</dd><dt>Client</dt><dd>${esc(c.client)}</dd><dt>Year</dt><dd>${esc(c.year)}</dd></dl>
+        </div>
+        <div class="stack-dim"></div>
+      </div>
+    </article>`).join('');
+
+  /* ---------- Detail dialog ---------- */
+  const dialog = $('#detail');
+  const detailContent = $('#detail-content');
+  const panel = $('.detail-panel');
+  let opener = null;
+  let closing = false;
+
+  function openDetail(f, from) {
+    if (!f || !dialog) return;
+    opener = from || null;
+    const img = f.poster || f.image;
+    const art = img ? `<div class="detail-poster"><img src="${img}" alt="${esc(f.title)}"></div>` : f.roles ? `<div class="detail-poster">${slate(f)}</div>` : '';
+    const facts = [
+      ['Role', f.roles ? f.roles.join(' / ') : f.role], ['Version editing', f.versionEditing], ['Language versions', f.languageVersions],
+      ['Director', f.director], ['Cast', f.cast], ['Production', f.production || f.client], ['Awards', f.award]
+    ].filter(x => x[1]);
+    detailContent.innerHTML = `${art}
+      <div class="detail-copy"><span class="mono">${esc(f.year)} / ${esc([f.badge && /short|music/i.test(f.badge) ? f.badge : '', f.language].filter(Boolean).join(' · ') || f.badge)}</span><h2 id="detail-title">${esc(f.title)}</h2><p>${esc(f.description)}</p><dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
+    detailContent.classList.toggle('without-poster', !art);
+    const pic = $('.detail-poster img', detailContent);
+    pic?.addEventListener('error', () => {
+      pic.parentElement.replaceWith(Object.assign(document.createElement('p'), {className: 'image-unavailable', textContent: 'Poster unavailable.'}));
+    }, {once: true});
+    dialog.showModal();
+    lock(true);
+    if (motion) {
+      hideCursor();
+      gsap.fromTo(panel, {autoAlpha: 0, y: 40}, {autoAlpha: 1, y: 0, duration: .7, ease: 'expo.out'});
+      const artEl = $('.detail-poster > *', detailContent);
+      if (artEl) gsap.fromTo(artEl, {clipPath: 'inset(100% 0% 0% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.1, ease: 'expo.inOut', delay: .1});
+      gsap.fromTo($$('.detail-copy > *', detailContent), {y: 24, autoAlpha: 0}, {y: 0, autoAlpha: 1, duration: .8, ease: 'power3.out', stagger: .06, delay: .15});
+    }
+  }
+  function closeDetail() {
+    if (!dialog.open || closing) return;
+    if (!motion) return dialog.close();
+    closing = true;
+    gsap.to(panel, {autoAlpha: 0, y: 24, duration: .32, ease: 'power2.in', onComplete: () => { closing = false; dialog.close(); }});
+  }
+  function lock(on) {
+    root.classList.toggle('is-locked', on);
+    if (lenis) on ? lenis.stop() : lenis.start();
+  }
+  $('#close')?.addEventListener('click', closeDetail);
+  dialog?.addEventListener('cancel', e => { e.preventDefault(); closeDetail(); });
+  dialog?.addEventListener('click', e => { if (e.target === dialog) closeDetail(); });
+  dialog?.addEventListener('close', () => {
+    lock(false);
+    if (motion) gsap.set(panel, {clearProps: 'all'});
+    opener?.focus({preventScroll: true});
+  });
+
+  document.addEventListener('click', e => {
+    const row = e.target.closest('.archive-row');
+    if (row) {
+      showPreview(row.dataset.film, true);
+      placePreview(row);
+      if (narrow.matches) refresh();
+      return;
+    }
+    const hit = e.target.closest('[data-film]');
+    if (hit) return openDetail(findFilm(hit.dataset.film), hit);
+    const more = e.target.closest('.preview-open');
+    if (more) openDetail(findFilm(previewId), more);
+  });
+
+  /* ---------- Small live details ---------- */
+  const clock = $('#clock');
+  if (clock) {
+    const fmt = new Intl.DateTimeFormat('en-GB', {timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit'});
+    const tick = () => { clock.textContent = `Kerala ${fmt.format(new Date())} IST`; };
+    tick();
+    setInterval(tick, 20000);
+  }
+  // The viewfinder timecode runs while the opening frame is on screen.
+  const frameTc = $('#frame-tc');
+  if (frameTc && !reducedMotion && 'IntersectionObserver' in window) {
+    const start = performance.now();
+    let raf = 0, last = -1;
+    const run = now => {
+      const f = Math.floor((now - start) / (1000 / 24));
+      if (f !== last) { frameTc.textContent = timecode(f); last = f; }
+      raf = requestAnimationFrame(run);
+    };
+    new IntersectionObserver(([e]) => {
+      cancelAnimationFrame(raf);
+      if (e.isIntersecting) raf = requestAnimationFrame(run);
+    }).observe($('.hero'));
+  }
+
+  let hideCursor = () => {};
+
+  if (motion) initMotion();
+  else {
+    $('.loader')?.remove();
+    nativeReel();
+  }
+
+  /* =====================================================================
+     Motion
+     ===================================================================== */
+  function initMotion() {
+    gsap.registerPlugin(ScrollTrigger, SplitText);
+    root.classList.add('motion');
+    ScrollTrigger.config({ignoreMobileResize: true});
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+    lenis = new Lenis({lerp: .085, smoothWheel: true});
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add(t => lenis.raf(t * 1000));
+    gsap.ticker.lagSmoothing(0);
+
+    // In-page links glide instead of jumping.
+    document.addEventListener('click', e => {
+      const a = e.target.closest('a[href^="#"]');
+      if (!a) return;
+      const id = a.getAttribute('href').slice(1);
+      const target = id === 'home' || !id ? 0 : document.getElementById(id);
+      if (target === null) return;
+      e.preventDefault();
+      lenis.scrollTo(target, {duration: 1.8, easing: t => 1 - Math.pow(1 - t, 4), onComplete: () => target && target.focus?.({preventScroll: true})});
+    });
+
+    const header = $('.site-header');
+    lenis.on('scroll', ({scroll, direction}) => header.classList.toggle('is-hidden', direction > 0 && scroll > innerHeight * 1.2));
+
+    const mm = gsap.matchMedia();
+
+    /* --- Opening: the name rises, the portrait card is revealed and settles into its tilt --- */
+    const card = $('.hero-card');
+    const cardInner = $('.hero-card-inner');
+    const heroImg = $('.hero-card img');
+    const heroSplit = SplitText.create('.hero-line', {type: 'chars', charsClass: 'split-char', mask: 'chars'});
+
+    function heroIntro() {
+      return gsap.timeline()
+        .from(heroSplit.chars, {yPercent: 115, duration: 1.5, ease: 'expo.out', stagger: .035}, 0)
+        .fromTo(cardInner, {clipPath: 'inset(100% 0% 0% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.5, ease: 'expo.inOut'}, .15)
+        .from(cardInner, {rotation: -10, y: 70, duration: 2, ease: 'expo.out'}, .15)
+        .from('.frame-ui > *', {autoAlpha: 0, duration: .6, stagger: .06}, 1.1)
+        .from(['.hero-meta > *', '.hero-foot > *'], {autoAlpha: 0, y: 18, duration: 1, ease: 'power3.out', stagger: .06}, .8);
+    }
+
+    // A gentle depth on the way out: the card lifts and straightens a little, the name lags behind.
+    // The photo itself is never scaled.
+    gsap.timeline({defaults: {ease: 'none'}, scrollTrigger: {trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true}})
+      .to('.hero-name', {yPercent: 16}, 0)
+      .to(card, {y: () => -innerHeight * .1, rotation: 3}, 0)
+      .to('.hero-foot', {autoAlpha: 0, y: -16, duration: .35}, 0);
+
+    /* --- Film archive reel: vertical scroll drives the timeline under a fixed playhead --- */
+    const reelPin = $('.reel-pin');
+    mm.add({pinned: '(min-width: 768px) and (min-height: 560px)', native: '(max-width: 767px), (max-height: 559px)'}, ctx => {
+      if (ctx.conditions.native) return nativeReel();
+      const section = $('#archive');
+      section.classList.add('reel--pinned');
+      let dist = 0;
+      // Keep the whole pinned view on screen: if heading + strip + readout overflow, shrink the posters to fit.
+      const fitHeight = () => {
+        section.style.removeProperty('--clip-h');
+        const media = $('.reel-media', track);
+        const pin = getComputedStyle(reelPin);
+        const used = $('.reel-head').offsetHeight + $('.reel-stage').offsetHeight + $('.reel-readout').offsetHeight + parseFloat(pin.paddingTop) + parseFloat(pin.paddingBottom);
+        const over = used - innerHeight;
+        if (over > 0 && media) section.style.setProperty('--clip-h', `${Math.max(180, media.offsetHeight + 24 - over - 8)}px`);
+      };
+      const measure = () => { fitHeight(); measureReel(); dist = Math.max(0, track.offsetWidth - viewport.clientWidth); };
+      measure();
+      const pick = () => setActive(nearestClip(-gsap.getProperty(track, 'x') + viewport.clientWidth / 2));
+      const tween = gsap.to(track, {
+        x: () => -dist, ease: 'none',
+        scrollTrigger: {trigger: reelPin, start: 'top top', end: () => `+=${dist * .9}`, pin: true, scrub: true, invalidateOnRefresh: true, onRefreshInit: measure, onUpdate: pick, onRefresh: pick}
+      });
+      pick();
+      // Keyboard users tabbing through the posters get each one brought under the playhead.
+      const onFocus = e => {
+        const clip = e.target.closest('.reel-clip');
+        if (!clip || !clip.matches(':focus-visible') || !dist) return;
+        const st = tween.scrollTrigger;
+        const x = clipCenters[+clip.dataset.index] - viewport.clientWidth / 2;
+        lenis.scrollTo(st.start + gsap.utils.clamp(0, 1, x / dist) * (st.end - st.start), {immediate: true});
+      };
+      viewport.addEventListener('focusin', onFocus);
+      return () => {
+        viewport.removeEventListener('focusin', onFocus);
+        section.classList.remove('reel--pinned');
+        section.style.removeProperty('--clip-h');
+        gsap.set(track, {clearProps: 'x'});
+      };
+    });
+
+    /* --- Statement: words light up as you read --- */
+    const statement = SplitText.create('.statement-text', {type: 'words', wordsClass: 'split-word'});
+    gsap.fromTo(statement.words, {opacity: .12}, {opacity: 1, ease: 'none', stagger: .1, scrollTrigger: {trigger: '.statement-text', start: 'top 78%', end: 'bottom 42%', scrub: true}});
+
+    /* --- Marquee: speed and direction follow the scroll --- */
+    const marqueeRows = $$('.marquee-row');
+    const marqueeTweens = marqueeRows.map((row, i) => {
+      row.append($('.marquee-track', row).cloneNode(true));
+      const tracks = $$('.marquee-track', row);
+      return i % 2
+        ? gsap.fromTo(tracks, {xPercent: -100}, {xPercent: 0, duration: 40, ease: 'none', repeat: -1})
+        : gsap.fromTo(tracks, {xPercent: 0}, {xPercent: -100, duration: 40, ease: 'none', repeat: -1});
+    });
+    const skew = gsap.quickSetter(marqueeRows, 'skewX', 'deg');
+    let speed = 1, dir = 1, lean = 0;
+    gsap.ticker.add(() => {
+      const v = lenis.velocity || 0;
+      if (lenis.direction) dir = lenis.direction;
+      speed += (dir * (1 + Math.min(Math.abs(v) * .12, 6)) - speed) * .08;
+      lean += (gsap.utils.clamp(-7, 7, -v * .2) - lean) * .1;
+      marqueeTweens.forEach(t => t.timeScale(speed));
+      skew(lean);
+    });
+
+    /* --- Section furniture --- */
+    $$('.rule').forEach(r => gsap.fromTo(r, {scaleX: 0}, {scaleX: 1, duration: 1.6, ease: 'expo.inOut', scrollTrigger: {trigger: r.parentElement, start: 'top 90%', once: true}}));
+    $$('.section-top').forEach(t => gsap.from($$(':scope > span', t), {y: 14, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: t, start: 'top 90%', once: true}}));
+    $$('[data-split]').forEach(el => SplitText.create(el, {
+      type: 'lines', linesClass: 'split-line', mask: 'lines', autoSplit: true,
+      onSplit: self => gsap.from(self.lines, {yPercent: 115, duration: 1.3, ease: 'expo.out', stagger: .09, scrollTrigger: {trigger: el, start: 'top 86%', once: true}})
+    }));
+    $$('[data-fade]').forEach(el => gsap.from(el, {y: 24, autoAlpha: 0, duration: 1.1, ease: 'power3.out', scrollTrigger: {trigger: el, start: 'top 88%', once: true}}));
+
+    /* --- Upcoming posters: wipe in, then drift --- */
+    $$('.feature').forEach(card => {
+      gsap.timeline({scrollTrigger: {trigger: card, start: 'top 80%', once: true}})
+        .fromTo($('.feature-clip', card), {clipPath: 'inset(100% 0% 0% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.4, ease: 'expo.inOut'})
+        .fromTo($('.feature-zoom', card), {scale: 1.12}, {scale: 1, duration: 1.8, ease: 'expo.out'}, .2)
+        .from($$('.feature-copy > *', card), {y: 24, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08}, .45);
+    });
+
+    /* --- Filmography list --- */
+    gsap.set(rows, {autoAlpha: 0, y: 24});
+    ScrollTrigger.batch(rows, {start: 'top 94%', once: true, onEnter: batch => gsap.to(batch, {autoAlpha: 1, y: 0, duration: .8, ease: 'power3.out', stagger: .05, overwrite: true})});
+    gsap.from('.archive-preview', {autoAlpha: 0, y: 40, duration: 1.2, ease: 'expo.out', scrollTrigger: {trigger: '.archive-browser', start: 'top 80%', once: true}});
+
+    /* --- About: the page turns to paper --- */
+    ScrollTrigger.create({trigger: '#about', start: 'top 55%', end: 'bottom 45%', onToggle: s => { document.body.dataset.theme = s.isActive ? 'light' : 'dark'; }});
+    gsap.to('.asterisk', {rotate: 360, ease: 'none', scrollTrigger: {trigger: '#about', start: 'top bottom', end: 'bottom top', scrub: true}});
+    gsap.from('.disciplines li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: '.disciplines', start: 'top 88%', once: true}});
+
+    /* --- TV commercials: the count runs up once the brief is in view --- */
+    const tvcCount = $('.tvc-count');
+    if (tvcCount) {
+      const n = {v: 0};
+      gsap.to(n, {v: +tvcCount.dataset.count, duration: 2, ease: 'power3.out', scrollTrigger: {trigger: '.tvc-stat', start: 'top 85%', once: true},
+        onStart: () => { tvcCount.textContent = '0'; }, onUpdate: () => { tvcCount.textContent = Math.round(n.v); }});
+    }
+
+    gsap.from('.tvc-beats li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .09, scrollTrigger: {trigger: '.tvc-beats', start: 'top 88%', once: true}});
+
+    /* --- TV commercials: players wipe in --- */
+    $$('.spot').forEach((spot, i) => {
+      gsap.timeline({scrollTrigger: {trigger: spot, start: 'top 85%', once: true}})
+        .fromTo($('.spot-player', spot), {clipPath: 'inset(0% 0% 100% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.3, ease: 'expo.inOut', delay: (i % 2) * .12})
+        .from($$('.spot-info > *', spot), {y: 18, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .06}, .5);
+    });
+
+    /* --- Beyond the frame: cards stack and recede --- */
+    $$('.stack-card').forEach(card => gsap.from($('.stack-media img', card), {scale: 1.25, duration: 1.8, ease: 'expo.out', scrollTrigger: {trigger: card, start: 'top 85%', once: true}}));
+    mm.add('(min-width: 900px) and (min-height: 640px)', () => {
+      const cards = $$('.stack-card');
+      cards.slice(0, -1).forEach((card, i) => {
+        gsap.timeline({scrollTrigger: {trigger: cards[i + 1], start: 'top bottom', end: () => `top ${header.offsetHeight + 12 + (i + 1) * 16}px`, scrub: true}})
+          .to($('.stack-inner', card), {scale: .92, ease: 'none'}, 0)
+          .to($('.stack-dim', card), {opacity: .55, ease: 'none'}, 0);
+      });
+    });
+
+    /* --- Contact: the light floods in --- */
+    gsap.fromTo('.contact-fill', {clipPath: 'circle(0% at 50% 100%)'}, {clipPath: 'circle(150% at 50% 100%)', ease: 'none', scrollTrigger: {trigger: '#contact', start: 'top bottom', end: 'top 15%', scrub: true}});
+    gsap.from('.ct-line > span', {yPercent: 115, duration: 1.4, ease: 'expo.out', stagger: .1, scrollTrigger: {trigger: '.contact-title', start: 'top 80%', once: true}});
+    gsap.from('.contact-orb', {scale: 0, rotate: -90, duration: 1.4, ease: 'expo.out', scrollTrigger: {trigger: '.contact-title', start: 'top 80%', once: true}});
+    gsap.from(['.contact-bottom > *', '#contact footer > *'], {y: 16, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .06, scrollTrigger: {trigger: '.contact-bottom', start: 'top 95%', once: true}});
+
+    /* --- Timeline HUD --- */
+    const hud = $('.hud');
+    const hudTc = $('#hud-tc');
+    const hudReel = $('#hud-reel');
+    const hudMarkers = $('#hud-markers');
+    // Like an editor's overlay: it shows while you scrub and steps aside when you stop to read.
+    let hudIdle;
+    lenis.on('scroll', ({scroll, limit}) => {
+      hudTc.textContent = timecode(Math.max(0, Math.round(scroll / 2)));
+      hud.style.setProperty('--p', limit ? scroll / limit : 0);
+      hud.classList.add('is-scrubbing');
+      clearTimeout(hudIdle);
+      hudIdle = setTimeout(() => hud.classList.remove('is-scrubbing'), 1100);
+    });
+    const reelTriggers = $$('[data-reel]').map((sec, i) => ScrollTrigger.create({
+      trigger: sec, start: 'top 50%', end: 'bottom 50%',
+      onToggle: s => { if (s.isActive) hudReel.textContent = `R${pad(i + 1)} — ${sec.dataset.reel}`; }
+    }));
+    ScrollTrigger.create({trigger: '#contact', start: 'top 70%', onToggle: s => hud.classList.toggle('is-off', s.isActive)});
+    ScrollTrigger.addEventListener('refresh', () => {
+      const max = ScrollTrigger.maxScroll(window) || 1;
+      hudMarkers.innerHTML = reelTriggers.map(t => `<i style="left:${gsap.utils.clamp(0, 100, (t.start + innerHeight * .5) / max * 100)}%"></i>`).join('');
+    });
+
+    /* --- Pointer: a "view" lens over the films, magnetic buttons --- */
+    if (finePointer) {
+      root.classList.add('has-cursor');
+      const cursor = $('.cursor');
+      const label = $('.cursor-label');
+      const xTo = gsap.quickTo(cursor, 'x', {duration: .45, ease: 'power3'});
+      const yTo = gsap.quickTo(cursor, 'y', {duration: .45, ease: 'power3'});
+      let placed = false, current = null;
+      addEventListener('pointermove', e => {
+        if (!placed) { gsap.set(cursor, {x: e.clientX, y: e.clientY}); placed = true; }
+        xTo(e.clientX);
+        yTo(e.clientY);
+      }, {passive: true});
+      hideCursor = () => {
+        current = null;
+        gsap.to(cursor, {scale: 0, autoAlpha: 0, duration: .3, ease: 'power3.out', overwrite: 'auto'});
+      };
+      document.addEventListener('pointerover', e => {
+        const t = e.target.closest('[data-cursor]');
+        if (t === current) return;
+        if (!t) return hideCursor();
+        current = t;
+        label.textContent = t.dataset.cursor;
+        gsap.to(cursor, {scale: 1, autoAlpha: 1, duration: .5, ease: 'expo.out', overwrite: 'auto'});
+      });
+      $$('[data-magnetic]').forEach(el => {
+        const mx = gsap.quickTo(el, 'x', {duration: .9, ease: 'elastic.out(1, .35)'});
+        const my = gsap.quickTo(el, 'y', {duration: .9, ease: 'elastic.out(1, .35)'});
+        el.addEventListener('pointermove', e => {
+          const r = el.getBoundingClientRect();
+          mx((e.clientX - r.left - r.width / 2) * .35);
+          my((e.clientY - r.top - r.height / 2) * .35);
+        });
+        el.addEventListener('pointerleave', () => { mx(0); my(0); });
+      });
+    }
+
+    /* --- Ordering, late layout, and the opening --- */
+    ScrollTrigger.sort();
+    document.fonts?.ready.then(() => ScrollTrigger.refresh());
+    addEventListener('load', () => {
+      $$('.reel-clip img, .stack-media img, .feature img').forEach(img => { img.loading = 'eager'; });
+      ScrollTrigger.refresh();
+    });
+
+    const loader = $('.loader');
+    const hashTarget = location.hash.length > 1 ? document.getElementById(location.hash.slice(1)) : null;
+    if (hashTarget || !loader) {
+      loader?.remove();
+      heroIntro().progress(1);
+      if (hashTarget) document.fonts?.ready.then(() => { ScrollTrigger.refresh(); lenis.scrollTo(hashTarget, {immediate: true, force: true}); });
+      return;
+    }
+
+    scrollTo(0, 0);
+    lenis.stop();
+    (async () => {
+      const tc = $('.loader-tc');
+      const count = {f: 0};
+      const ready = Promise.race([Promise.all([document.fonts?.ready, imgReady(heroImg)]), wait(2600)]);
+      await gsap.timeline()
+        .from('.loader-inner > *', {autoAlpha: 0, y: 12, duration: .6, ease: 'power3.out', stagger: .06})
+        .to(count, {f: 47, duration: 1.3, ease: 'power2.inOut', onUpdate: () => { tc.textContent = timecode(Math.round(count.f)); }}, .1)
+        .to('.loader-line i', {scaleX: 1, duration: 1.3, ease: 'power2.inOut'}, .1);
+      await ready;
+      gsap.timeline({onComplete: () => loader.remove()})
+        .to('.loader-inner', {autoAlpha: 0, y: -16, duration: .45, ease: 'power2.in'})
+        .to('.loader-panel--top', {yPercent: -100, duration: 1.2, ease: 'expo.inOut'}, '-=.05')
+        .to('.loader-panel--bottom', {yPercent: 100, duration: 1.2, ease: 'expo.inOut'}, '<')
+        .add(heroIntro(), '<.4')
+        .call(() => lenis.start(), null, 1.2);
+    })();
+  }
+})();
