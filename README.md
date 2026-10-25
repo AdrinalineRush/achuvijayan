@@ -1,50 +1,71 @@
-# Achu Vijayan — Personal Portfolio Website
+# Achu Vijayan — portfolio
 
-Official cinematic portfolio for **Achu Vijayan** — Film Director, Editor, Producer, VFX Artist & Colorist (Kerala, India).
-
-A static site with no build step, deployed on Vercel.
-
----
+Static portfolio for filmmaker and editor Achu Vijayan, hosted on Vercel at
+https://achuvijayan.com. No application build step or package installation is needed.
 
 ## Structure
 
-```
-AchuVijayan/
-├── index.html      # Page structure, copy and SEO / social metadata
-├── style.css       # Design system, layouts, and the no-JS / reduced-motion fallback
-├── app.js          # Renders films + campaigns from data.js, archive, dialog, scroll motion
-├── data.js         # Filmography (FEATURE_FILMS) and AI campaigns (AI_CAMPAIGNS)
-├── vendor/         # GSAP 3.15 (+ ScrollTrigger, SplitText) and Lenis 1.3.26, self-hosted
-├── assets/
-│   ├── icons/      # Logo and favicons
-│   └── images/     # Portrait, film posters, campaign images
-└── vercel.json     # Headers and caching
-```
-
-## The page
-
-1. **Opening** — film-leader loader, then the name parts as the portrait frame opens to full height.
-2. **Statement** — words light up as they scroll past; a marquee follows scroll speed and direction.
-3. **01 Upcoming work** — House For Sale and Boom Bang, revealed with poster wipes and parallax.
-4. **02 The film archive** — a pinned horizontal timeline of every title (oldest → newest) under a playhead, then the filterable complete filmography with a poster preview.
-5. **03 About** — the page turns to paper.
-6. **04 Beyond the frame** — AI campaign cards that stack as you scroll.
-7. **05 Contact** — the lime panel floods in from below.
-
-Motion is skipped for visitors who prefer reduced motion; every section still reads as a static page without JavaScript.
-
-## Editing content
-
-- **Add or change a film:** edit `FEATURE_FILMS` in `data.js` (newest first). Put the poster in `assets/images/`
-  and add its pixel size to `POSTER_SIZE` in `app.js` so the timeline can lay out before images load.
-  A film with an empty `poster` gets a clapperboard slate instead.
-- **Upcoming films:** the `UPCOMING` list in `app.js`.
-- After changing `data.js`, `style.css` or `app.js`, bump the `?v=` query on its tag in `index.html`.
+- `index.html`: page content, selected films, static filmography fallback and sharing metadata.
+- `style.css`: responsive layout and reduced-motion rules.
+- `app.js`: film browsing, navigation, video players, dialogs and scroll animation.
+- `data.js`: filmography, commercials and AI films.
+- `image-sources.js`: generated responsive-image manifest.
+- `assets/icons/`: active logo and favicons.
+- `assets/images/`: current original artwork; `optimized/` contains generated WebP copies.
+- `assets/video/`: full films, short previews and their poster sources.
+- `assets/social/`: sharing card and editable SVG source.
+- `vendor/`: self-hosted GSAP, ScrollTrigger, SplitText and Lenis.
+- `scripts/`: local preview and image generation tools; excluded from deployment.
+- `vercel.json`: hosting and caching rules.
 
 ## Local preview
 
-```bash
-python3 -m http.server 4173
+```sh
+python3 scripts/serve.py
 ```
 
-Then open `http://localhost:4173`.
+Open http://127.0.0.1:4175. Use `--port 4173` for another port.
+The server disables caching and supports video byte ranges for seeking.
+
+## Editing content
+
+Edit `FEATURE_FILMS`, `TV_COMMERCIALS` or `AI_FILMS` in `data.js`.
+Keep the three static selected-film cards and the static filmography fallback in
+`index.html` consistent with changes to credits. Upcoming IDs are in `UPCOMING`
+in `app.js`.
+
+After adding or changing artwork:
+
+```sh
+python3 scripts/optimize-images.py
+```
+
+Requires Python 3, ImageMagick (`magick`) and `cwebp`. The generator reads image
+references from the current HTML and data, preserves originals, skips existing
+copies and removes obsolete files from the generated `optimized/` directory.
+Do not put manually created artwork inside that generated directory.
+
+Image dimensions come from the manifest; `POSTER_SIZE` is a fallback. Bump affected
+`?v=` tags in the HTML after changing scripts or styles. Optimized filenames
+already change when the source artwork changes.
+
+Full videos load on play. Silent previews load near the viewport, except when
+reduced motion or a supported data-saving preference is active.
+
+## Deployment
+
+The connected Vercel project deploys pushes to `main`. Review changes locally
+and obtain the owner's approval before pushing. `.vercelignore` excludes local
+configuration, tooling and documentation. Never commit credentials, `.vercel/`,
+`.claude/` or backup exports.
+
+Ordinary media revalidates after one day. Content-versioned WebP images use
+long-lived immutable caching. Use a new filename when replacing other media
+to avoid serving an older cached version.
+
+## Retired versions
+
+The classic site, exports, duplicate branding, unused artwork and old video
+loops were moved to a recovery archive outside this workspace. The archive
+preserves the retired nested Git repository and a bundle of the main repository.
+They are not dependencies of the current site.

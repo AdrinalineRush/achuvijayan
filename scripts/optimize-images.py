@@ -4,6 +4,7 @@ Run from the project root with Python 3, ImageMagick and cwebp installed.
 """
 import json
 import hashlib
+import re
 from pathlib import Path
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
@@ -11,8 +12,11 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / 'assets/images/optimized'
 OUTPUT.mkdir(parents=True, exist_ok=True)
-sources = sorted((ROOT / 'assets/images').glob('*.jpg'))
-sources += sorted((ROOT / 'assets/video').glob('*-poster.jpg'))
+# Only generate copies for source artwork referenced by the current page/data.
+# Do not scan the manifest: that would retain retired variants forever.
+content = '\n'.join((ROOT / name).read_text() for name in ('index.html', 'data.js'))
+sources = sorted({ROOT / name for name in re.findall(
+    r'''assets/(?:images|video)/[^\s<>"'?#]+\.(?:jpg|png)''', content)})
 
 
 def convert(source):
@@ -23,8 +27,9 @@ def convert(source):
     variants = []
     for target in widths:
         output = OUTPUT / f'{source.stem}-{version}-{target}.webp'
-        subprocess.run(['cwebp', '-quiet', '-q', '82', '-m', '6', '-resize', str(target), '0',
-                        str(source), '-o', str(output)], check=True)
+        if not output.exists() or not output.stat().st_size:
+            subprocess.run(['cwebp', '-quiet', '-q', '82', '-m', '6', '-resize', str(target), '0',
+                            str(source), '-o', str(output)], check=True)
         variants.append({'src': output.relative_to(ROOT).as_posix(), 'width': target})
     return source.relative_to(ROOT).as_posix(), {'width': width, 'height': height, 'variants': variants}
 

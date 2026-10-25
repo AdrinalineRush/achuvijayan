@@ -1,6 +1,10 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "redirects": [
+    { "source": "/classic", "destination": "/", "permanent": true },
+    { "source": "/classic.html", "destination": "/", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",

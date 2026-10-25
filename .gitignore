@@ -5,3 +5,10 @@ node_modules/
 .idea/
 *.log
 .vercel
+.claude/
+.openai/
+__pycache__/
+*.pyc
+.venv/
+/sites/
+*.tar.gz

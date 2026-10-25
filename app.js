@@ -61,8 +61,8 @@
   // Intrinsic poster sizes, so the reel lays out before the images arrive.
   const POSTER_SIZE = {
     '32aam_adhyayam': [682, 1024], aaram: [458, 669], aattam: [702, 1024], boom_bang: [768, 1024],
-    charles_enterprises: [768, 1024], ezham_suryan: [548, 730], house_for_sale: [768, 1024], kidu: [1200, 1600],
-    maffi_dona: [715, 960], mukundan_unni: [261, 382], mukundan_unni_hd: [752, 1100], namaste_bali: [680, 859], oru_adaar_love: [768, 1024],
+    charles_enterprises: [768, 1024], house_for_sale: [768, 1024], kidu: [1200, 1600],
+    mukundan_unni_hd: [752, 1100], namaste_bali: [680, 859], oru_adaar_love: [768, 1024],
     second_show: [258, 387], simba: [750, 1024], starring_pournami: [540, 720], thuninthavan: [720, 1280],
     vichithram: [576, 1024], white: [768, 1024], gudiya: [825, 1100], flip_side: [733, 1100], copy_that: [742, 1100], maanasi: [806, 1100], narai: [215, 283]
   };

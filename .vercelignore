@@ -1,0 +1,12 @@
+.git/
+.claude/
+.openai/
+.vercel/
+scripts/
+README.md
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.tar.gz
+sites/
