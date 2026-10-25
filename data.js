@@ -297,49 +297,6 @@ const FEATURE_FILMS = [
   }
 ];
 
-const AI_CAMPAIGNS = [
-  {
-    id: "allwyn",
-    title: "Allwyn — 'Possible is Beautiful'",
-    year: "2024",
-    role: "AI Video Producer & Storyboard Design",
-    client: "The Gate Worldwide",
-    badge: "AI Brand Campaign",
-    image: "assets/images/allwyn.jpg",
-    description: "Crafted a 30-second AI campaign animatic, 22-slide storyboard deck, and character consistency mapping for international lottery and entertainment giant Allwyn."
-  },
-  {
-    id: "breeze",
-    title: "Breeze — 25th Anniversary",
-    year: "2025",
-    role: "AI Video Producer & Editor",
-    client: "Breeze",
-    badge: "AI Brand Film",
-    image: "assets/images/breeze.jpg",
-    description: "'Breeze Museum of Art' 25th anniversary brand film — end-to-end local generative AI video production from prompt engineering mapping to the final editorial cut."
-  },
-  {
-    id: "sc-banca",
-    title: "SC Banca 2.0",
-    year: "2025",
-    role: "AI Deliverables & KV Extensions",
-    client: "Standard Chartered × Prudential",
-    badge: "AI Banking Campaign",
-    image: "assets/images/sc_banca.jpg",
-    description: "Key visual extensions, character consistency meshes, and final localized campaign deliverables powered by custom Stable Diffusion and Kling pipelines."
-  },
-  {
-    id: "aistory",
-    title: "Aistory — Cinema & AI Lab",
-    year: "Ongoing",
-    role: "Creator & Pipeline Architect",
-    client: "Creator Platform",
-    badge: "Education & Tech Hub",
-    image: "assets/images/aistory.jpg",
-    description: "Online educational and research channel showing filmmakers how to bridge traditional cinema post-production (DaVinci Resolve, Premiere Pro) with local ComfyUI models and generative video pipelines."
-  }
-];
-
 const MILESTONES = [
   {
     stat: "10+",
@@ -396,4 +353,22 @@ const TV_COMMERCIALS = [
   { title: "Cathay Pacific — Student Fare", brand: "Cathay Pacific", year: "2026", duration: "1:07", role: "VFX & Editor", video: "https://youtu.be/td3I1mamYR4", poster: "" },
   { title: "Dr. Joy's Medstore — Film 2", brand: "Dr. Joy's Medstore", year: "2023", duration: "0:42", role: "Director & Editor", video: "https://youtu.be/xxp5gB2fTbI", poster: "" },
   { title: "Pappai Ice Cream", brand: "Pappai", year: "2017", duration: "0:30", role: "Editor", video: "https://youtu.be/VFSJlloIPgc", poster: "" }
+];
+
+/**
+ * Fully AI films, shown as screens in "05 / AI filmmaking".
+ * A 9:16 film goes on the phone; 16:9 films go on cinema screens.
+ * Own files: `loop` is the silent web loop, `full` the version with sound. YouTube films: `youtube` id.
+ * `credit` is the one-line story of what I did, shown under the title.
+ */
+const AI_FILMS = [
+  { id: "tarmac", title: "My Storage Space — Tarmac", type: "AI brand film", format: "9:16", duration: "1:10", role: "AI filmmaker & editor",
+    credit: "Storyboard to screen — every frame generated, every cut mine.",
+    loop: "assets/video/tarmac-loop.mp4", full: "assets/video/tarmac.mp4", poster: "assets/video/tarmac-poster.jpg" },
+  { id: "fashion-studio", title: "Fashion Studio", type: "AI fashion film", format: "16:9", duration: "0:30", role: "AI filmmaker & editor",
+    credit: "The looks, the cities, the light — all generated. The rhythm is mine.",
+    loop: "assets/video/fashion-loop.mp4", full: "assets/video/fashion.mp4", poster: "assets/video/fashion-poster.jpg" },
+  { id: "cathay-student-fare", title: "Cathay Pacific — Student Fare", type: "AI brand film", format: "16:9", duration: "1:07", role: "AI filmmaker, VFX & editor",
+    credit: "Generated, composited and cut — from the first frame to the final grade.",
+    loop: "assets/video/cathay-loop.mp4", full: "assets/video/cathay.mp4", poster: "assets/video/cathay-poster.jpg" }
 ];

@@ -1,5 +1,5 @@
 /* Achu Vijayan — portfolio behaviour.
-   Renders the film and campaign collections from data.js, runs the archive browser and the
+   Renders the films, commercials and AI films from data.js, runs the archive browser and the
    detail dialog, then (unless the visitor prefers reduced motion) adds smooth scrolling and
    the scroll-driven sequences with GSAP + ScrollTrigger + SplitText + Lenis. */
 (() => {
@@ -22,7 +22,6 @@
 
   const root = document.documentElement;
   const films = typeof FEATURE_FILMS !== 'undefined' ? FEATURE_FILMS : [];
-  const campaigns = typeof AI_CAMPAIGNS !== 'undefined' ? AI_CAMPAIGNS : [];
   const findFilm = id => films.find(f => f.id === id);
 
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -283,20 +282,80 @@
     if (play) playSpot(+play.dataset.spot);
   });
 
-  /* ---------- Beyond the frame: campaign cards ---------- */
-  const stack = $('#campaigns');
-  if (stack) stack.innerHTML = campaigns.map((c, i) => `<article class="stack-card" style="--i:${i}">
-      <div class="stack-inner">
-        <div class="stack-media"><img src="${c.image}" alt="${esc(c.title)}" loading="lazy" decoding="async"></div>
-        <div class="stack-copy">
-          <div class="stack-top mono"><span>${pad(i + 1)} / ${pad(campaigns.length)}</span><span>${esc(c.badge)}</span></div>
-          <h3>${esc(c.title)}</h3>
-          <p>${esc(c.description)}</p>
-          <dl><dt>Role</dt><dd>${esc(c.role)}</dd><dt>Client</dt><dd>${esc(c.client)}</dd><dt>Year</dt><dd>${esc(c.year)}</dd></dl>
+  /* ---------- AI filmmaking: films on a phone and on cinema screens ---------- */
+  const aiFilms = typeof AI_FILMS !== 'undefined' ? AI_FILMS : [];
+  const screensEl = $('#ai-screens');
+  if (screensEl && aiFilms.length) {
+    const playIcon = '<span class="screen-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></svg></span>';
+    const screen = (f, i) => `<div class="screen-col${f.format === '9:16' ? ' is-phone' : ' is-cinema'}">
+        <div class="${f.format === '9:16' ? 'phone' : 'cinema'}">
+          <button class="screen" type="button" data-ai="${f.id}" data-cursor="Play" aria-label="Watch ${esc(f.title)} with sound">
+            ${f.loop
+              ? `<video class="screen-media" muted loop playsinline preload="metadata" poster="${esc(f.poster)}" data-src="${esc(f.loop)}"></video>`
+              : `<img class="screen-media" src="${esc(f.poster)}" alt="" loading="lazy" decoding="async">`}
+            ${playIcon}
+          </button>
         </div>
-        <div class="stack-dim"></div>
-      </div>
-    </article>`).join('');
+        <div class="screen-info">
+          <span class="mono">${pad(i + 1)}</span>
+          <h3>${esc(f.title)}</h3>
+          <button class="pill" type="button" data-ai="${f.id}">Watch <span aria-hidden="true">↗</span></button>
+          <span class="mono screen-meta">${esc([f.type, f.format, f.duration].filter(Boolean).join(' · '))}</span>
+          ${f.credit ? `<p class="screen-credit">${esc(f.credit)}</p>` : ''}
+          ${f.role ? `<span class="mono screen-role">${esc(f.role)}</span>` : ''}
+        </div>
+      </div>`;
+    const phones = aiFilms.filter(f => f.format === '9:16'), wides = aiFilms.filter(f => f.format !== '9:16');
+    screensEl.insertAdjacentHTML('beforeend', `<div class="screens-stage${phones.length ? '' : ' no-phone'}">${[...phones, ...wides].map((f) => screen(f, aiFilms.indexOf(f))).join('')}</div>`);
+
+    // Silent loops play only while on screen (and not at all for reduced motion).
+    $$('video.screen-media', screensEl).forEach(v => {
+      v.muted = true;
+      if (reducedMotion || !('IntersectionObserver' in window)) { v.preload = 'none'; return; }
+      new IntersectionObserver(([e]) => {
+        if (e.isIntersecting) {
+          if (!v.src) v.src = v.dataset.src;
+          v.play().catch(() => {});
+        } else v.pause();
+      }, {rootMargin: '15% 0px'}).observe(v);
+    });
+  }
+
+  // Full film with sound: own files in a <video>, YouTube films in a privacy-enhanced embed.
+  const vbox = $('#vbox');
+  const vboxVideo = vbox && $('video', vbox), vboxFrame = vbox && $('iframe', vbox);
+  let vboxOpener = null;
+  function openFilm(id, from) {
+    const f = aiFilms.find(x => x.id === id);
+    if (!f || !vbox) return;
+    vboxOpener = from || null;
+    $$('video.screen-media').forEach(v => v.pause());
+    vboxVideo.hidden = !!f.youtube;
+    vboxFrame.hidden = !f.youtube;
+    vbox.classList.toggle('is-vertical', f.format === '9:16');
+    if (f.youtube) vboxFrame.src = `https://www.youtube-nocookie.com/embed/${f.youtube}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+    else Object.assign(vboxVideo, {src: f.full, poster: f.poster});
+    vbox.showModal();
+    lock(true);
+    hideCursor();
+    if (!f.youtube) vboxVideo.play().catch(() => {});
+  }
+  if (vbox) {
+    $('.vbox-close', vbox).addEventListener('click', () => vbox.close());
+    vbox.addEventListener('click', e => { if (e.target === vbox) vbox.close(); });
+    vbox.addEventListener('close', () => {
+      vboxVideo.pause();
+      vboxVideo.removeAttribute('src');
+      vboxVideo.load();
+      vboxFrame.removeAttribute('src');
+      lock(false);
+      vboxOpener?.focus({preventScroll: true});
+    });
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-ai]');
+    if (t) openFilm(t.dataset.ai, t);
+  });
 
   /* ---------- Detail dialog ---------- */
   const dialog = $('#detail');
@@ -469,7 +528,7 @@
       const pick = () => setActive(nearestClip(-gsap.getProperty(track, 'x') + viewport.clientWidth / 2));
       const tween = gsap.to(track, {
         x: () => -dist, ease: 'none',
-        scrollTrigger: {trigger: reelPin, start: 'top top', end: () => `+=${dist * .9}`, pin: true, scrub: true, invalidateOnRefresh: true, onRefreshInit: measure, onUpdate: pick, onRefresh: pick}
+        scrollTrigger: {trigger: reelPin, start: () => reelPin.offsetHeight < innerHeight ? 'center center' : 'top top', end: () => `+=${dist * .9}`, pin: true, scrub: true, invalidateOnRefresh: true, onRefreshInit: measure, onUpdate: pick, onRefresh: pick}
       });
       pick();
       // Keyboard users tabbing through the posters get each one brought under the playhead.
@@ -487,30 +546,6 @@
         section.style.removeProperty('--clip-h');
         gsap.set(track, {clearProps: 'x'});
       };
-    });
-
-    /* --- Statement: words light up as you read --- */
-    const statement = SplitText.create('.statement-text', {type: 'words', wordsClass: 'split-word'});
-    gsap.fromTo(statement.words, {opacity: .12}, {opacity: 1, ease: 'none', stagger: .1, scrollTrigger: {trigger: '.statement-text', start: 'top 78%', end: 'bottom 42%', scrub: true}});
-
-    /* --- Marquee: speed and direction follow the scroll --- */
-    const marqueeRows = $$('.marquee-row');
-    const marqueeTweens = marqueeRows.map((row, i) => {
-      row.append($('.marquee-track', row).cloneNode(true));
-      const tracks = $$('.marquee-track', row);
-      return i % 2
-        ? gsap.fromTo(tracks, {xPercent: -100}, {xPercent: 0, duration: 40, ease: 'none', repeat: -1})
-        : gsap.fromTo(tracks, {xPercent: 0}, {xPercent: -100, duration: 40, ease: 'none', repeat: -1});
-    });
-    const skew = gsap.quickSetter(marqueeRows, 'skewX', 'deg');
-    let speed = 1, dir = 1, lean = 0;
-    gsap.ticker.add(() => {
-      const v = lenis.velocity || 0;
-      if (lenis.direction) dir = lenis.direction;
-      speed += (dir * (1 + Math.min(Math.abs(v) * .12, 6)) - speed) * .08;
-      lean += (gsap.utils.clamp(-7, 7, -v * .2) - lean) * .1;
-      marqueeTweens.forEach(t => t.timeScale(speed));
-      skew(lean);
     });
 
     /* --- Section furniture --- */
@@ -557,16 +592,16 @@
         .from($$('.spot-info > *', spot), {y: 18, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .06}, .5);
     });
 
-    /* --- Beyond the frame: cards stack and recede --- */
-    $$('.stack-card').forEach(card => gsap.from($('.stack-media img', card), {scale: 1.25, duration: 1.8, ease: 'expo.out', scrollTrigger: {trigger: card, start: 'top 85%', once: true}}));
-    mm.add('(min-width: 900px) and (min-height: 640px)', () => {
-      const cards = $$('.stack-card');
-      cards.slice(0, -1).forEach((card, i) => {
-        gsap.timeline({scrollTrigger: {trigger: cards[i + 1], start: 'top bottom', end: () => `top ${header.offsetHeight + 12 + (i + 1) * 16}px`, scrub: true}})
-          .to($('.stack-inner', card), {scale: .92, ease: 'none'}, 0)
-          .to($('.stack-dim', card), {opacity: .55, ease: 'none'}, 0);
-      });
-    });
+    gsap.from('.ai-process li', {y: 24, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .12, scrollTrigger: {trigger: '.ai-process', start: 'top 85%', once: true}});
+
+    /* --- AI filmmaking: the screens slide in from opposite sides --- */
+    if ($('.screens-stage')) {
+      const st = {trigger: '.screens-stage', start: 'top 78%', once: true};
+      gsap.from('.screens .phone', {xPercent: -25, rotate: -6, autoAlpha: 0, duration: 1.5, ease: 'expo.out', scrollTrigger: st});
+      gsap.from('.screens .cinema', {xPercent: 18, autoAlpha: 0, duration: 1.5, ease: 'expo.out', stagger: .15, scrollTrigger: st});
+      gsap.from('.screen-info', {y: 20, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .1, delay: .5, scrollTrigger: st});
+      gsap.to('.screens-word', {xPercent: -14, ease: 'none', scrollTrigger: {trigger: '.screens', start: 'top bottom', end: 'bottom top', scrub: true}});
+    }
 
     /* --- Contact: the light floods in --- */
     gsap.fromTo('.contact-fill', {clipPath: 'circle(0% at 50% 100%)'}, {clipPath: 'circle(150% at 50% 100%)', ease: 'none', scrollTrigger: {trigger: '#contact', start: 'top bottom', end: 'top 15%', scrub: true}});
@@ -639,7 +674,7 @@
     ScrollTrigger.sort();
     document.fonts?.ready.then(() => ScrollTrigger.refresh());
     addEventListener('load', () => {
-      $$('.reel-clip img, .stack-media img, .feature img').forEach(img => { img.loading = 'eager'; });
+      $$('.reel-clip img, .feature img').forEach(img => { img.loading = 'eager'; });
       ScrollTrigger.refresh();
     });
 
