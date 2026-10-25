@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0b0b0a"/>
+  <rect x="735" width="465" height="630" fill="#191b16"/>
+  <image x="755" y="35" width="410" height="560" preserveAspectRatio="xMidYMid meet" xlink:href="../images/achu-vijayan.jpg"/>
+  <rect x="775" y="55" width="370" height="520" fill="none" stroke="#ece8df" stroke-opacity=".3"/>
+  <circle cx="64" cy="65" r="5" fill="#d8fa63"/>
+  <text x="84" y="72" fill="#ece8df" font-family="Arial, sans-serif" font-size="17" letter-spacing="3">FILMMAKER &amp; EDITOR</text>
+  <text x="56" y="260" fill="#ece8df" font-family="Arial" font-size="112" font-weight="bold">ACHU</text>
+  <text x="56" y="388" fill="#ece8df" font-family="Arial" font-size="112" font-weight="bold">VIJAYAN</text>
+  <circle cx="532" cy="379" r="9" fill="#d8fa63"/>
+  <text x="64" y="467" fill="#d8fa63" font-family="Georgia, serif" font-size="29" font-style="italic">Stories that stay. Frames that feel.</text>
+  <line x1="64" y1="534" x2="670" y2="534" stroke="#ece8df" stroke-opacity=".2"/>
+  <text x="64" y="574" fill="#b4b2a9" font-family="Arial, sans-serif" font-size="18" letter-spacing="2">ACHUVIJAYAN.COM</text>
+  <text x="670" y="574" text-anchor="end" fill="#b4b2a9" font-family="Arial, sans-serif" font-size="14" letter-spacing="1">KERALA, INDIA</text>
+</svg>

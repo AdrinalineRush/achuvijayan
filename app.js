@@ -24,11 +24,39 @@
   const films = typeof FEATURE_FILMS !== 'undefined' ? FEATURE_FILMS : [];
   const findFilm = id => films.find(f => f.id === id);
 
-  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let savedMotion = false;
+  try { savedMotion = localStorage.getItem('achu-reduced-motion') === 'true'; } catch {}
+  const systemMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = systemMotion || savedMotion;
+  if (reducedMotion) root.classList.add('motion-reduced');
   const motion = !reducedMotion && ['gsap', 'ScrollTrigger', 'SplitText', 'Lenis'].every(n => typeof window[n] !== 'undefined');
   const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
   const narrow = matchMedia('(max-width: 760px)');
   let lenis = null;
+  const motionToggle = $('.motion-toggle');
+  if (motionToggle) {
+    motionToggle.hidden = false;
+    motionToggle.setAttribute('aria-pressed', String(reducedMotion));
+    motionToggle.textContent = reducedMotion ? 'Motion reduced' : 'Reduce motion';
+    motionToggle.disabled = systemMotion;
+    if (systemMotion) motionToggle.title = 'Reduced motion follows your device settings';
+    motionToggle.addEventListener('click', () => {
+      try { localStorage.setItem('achu-reduced-motion', String(!savedMotion)); } catch { return; }
+      history.replaceState(null, '', '#contact');
+      location.reload();
+    });
+  }
+  // Close the work menu after a choice, an outside click, or Escape.
+  const workMenu = $('.work-menu');
+  document.addEventListener('click', e => {
+    if (workMenu && (!workMenu.contains(e.target) || e.target.closest('a'))) workMenu.open = false;
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && workMenu?.open) {
+      workMenu.open = false;
+      $('summary', workMenu).focus();
+    }
+  });
 
   // Intrinsic poster sizes, so the reel lays out before the images arrive.
   const POSTER_SIZE = {
@@ -38,7 +66,15 @@
     second_show: [258, 387], simba: [750, 1024], starring_pournami: [540, 720], thuninthavan: [720, 1280],
     vichithram: [576, 1024], white: [768, 1024], gudiya: [825, 1100], flip_side: [733, 1100], copy_that: [742, 1100], maanasi: [806, 1100], narai: [215, 283]
   };
-  const posterSize = src => POSTER_SIZE[String(src || '').split('/').pop().replace(/\.\w+$/, '')] || [3, 4];
+  const responsiveImages = typeof RESPONSIVE_IMAGES === 'undefined' ? {} : RESPONSIVE_IMAGES;
+  const posterSize = src => responsiveImages[src]
+    ? [responsiveImages[src].width, responsiveImages[src].height]
+    : POSTER_SIZE[String(src || '').split('/').pop().replace(/\.\w+$/, '')] || [3, 4];
+  const imageAttrs = (src, sizes) => {
+    const image = responsiveImages[src];
+    return `src="${esc(src)}"${image ? ` srcset="${image.variants.map(v => `${esc(v.src)} ${v.width}w`).join(', ')}" sizes="${sizes}"` : ''}`;
+  };
+  const optimizedPoster = src => responsiveImages[src]?.variants.at(-1)?.src || src;
 
   // Titles without artwork (shorts, music videos) get a clapperboard slate in place of a poster.
   const slate = (f, cls = '') => `<span class="slate ${cls}" role="img" aria-label="${esc(f.title)}, ${esc(f.badge || 'film')}, ${esc(f.year)}">
@@ -69,7 +105,7 @@
     const facts = [['Role', f.roles.join(' / ')], ['Language', f.language], ['Director', f.director], ['Production', f.production], ['Cast', f.cast]].filter(x => x[1]);
     return `<article class="feature">
       <button class="feature-media" type="button" data-film="${f.id}" data-cursor="View" aria-label="View details: ${esc(f.title)}">
-        <span class="feature-clip"><span class="feature-zoom"><img src="${f.poster}" alt="${esc(f.title)} film poster" width="${w}" height="${h}" loading="lazy" decoding="async"></span></span>
+        <span class="feature-clip"><span class="feature-zoom"><img ${imageAttrs(f.poster, '(max-width: 760px) 85vw, 400px')} alt="${esc(f.title)} film poster" width="${w}" height="${h}" loading="lazy" decoding="async"></span></span>
       </button>
       <div class="feature-copy">
         <div class="feature-top mono"><span>${pad(i + 1)} / ${pad(all.length)}</span><span class="feature-status"><i></i>${esc(f.badge)}</span><span>${esc(f.year)}</span></div>
@@ -89,7 +125,7 @@
     const [w, h] = posterSize(f.poster);
     return `<button class="reel-clip" type="button" data-film="${f.id}" data-index="${i}" data-cursor="Open" aria-label="${esc(f.title)}, ${esc(f.year)}">
       <span class="reel-clip-head mono" aria-hidden="true"><span>${esc(f.year)}</span><span>${pad(i + 1)}</span></span>
-      ${f.poster ? `<img class="reel-media" src="${f.poster}" alt="" width="${w}" height="${h}" loading="lazy" decoding="async">` : slate(f, 'reel-media')}
+      ${f.poster ? `<img class="reel-media" ${imageAttrs(f.poster, '(max-width: 760px) 280px, 320px')} alt="" width="${w}" height="${h}" loading="lazy" decoding="async">` : slate(f, 'reel-media')}
     </button>`;
   }).join('');
   const reelClips = $$('.reel-clip');
@@ -101,11 +137,18 @@
   function setActive(i) {
     if (i === activeIndex || !chrono[i]) return;
     activeIndex = i;
+    // Prepare only nearby posters; keep the rest of the archive lazy.
+    reelClips.slice(Math.max(0, i - 1), i + 3).forEach(clip => {
+      const img = $('img', clip);
+      if (img) img.loading = 'eager';
+    });
     reelClips.forEach((c, n) => c.classList.toggle('is-active', n === i));
     const f = chrono[i];
     const title = $('#reel-active-title'), meta = $('#reel-active-meta'), desc = $('#reel-active-desc');
     $('#reel-year').textContent = f.year;
     $('#reel-index').textContent = pad(i + 1);
+    if ($('#reel-prev')) $('#reel-prev').disabled = i === 0;
+    if ($('#reel-next')) $('#reel-next').disabled = i === chrono.length - 1;
     title.textContent = f.title;
     meta.textContent = [f.roles.join(' · '), f.language].filter(Boolean).join(' — ');
     desc.textContent = f.description || '';
@@ -122,6 +165,12 @@
     clipCenters = reelClips.map(c => c.offsetLeft + c.offsetWidth / 2);
   }
   const nearestClip = x => clipCenters.reduce((best, c, i) => Math.abs(c - x) < Math.abs(clipCenters[best] - x) ? i : best, 0);
+  let seekReel = i => {
+    if (!reelClips[i]) return;
+    viewport.scrollTo({left: clipCenters[i] - viewport.clientWidth / 2, behavior: reducedMotion ? 'instant' : 'smooth'});
+  };
+  $('#reel-prev')?.addEventListener('click', () => seekReel(activeIndex - 1));
+  $('#reel-next')?.addEventListener('click', () => seekReel(activeIndex + 1));
 
   // Phones, short screens and reduced motion: a native swipeable strip.
   function nativeReel() {
@@ -158,7 +207,7 @@
     previewId = id;
     const art = $('.archive-preview-art', preview);
     const [w, h] = posterSize(f.poster);
-    art.innerHTML = f.poster ? `<img src="${f.poster}" alt="${esc(f.title)} poster" width="${w}" height="${h}">` : slate(f);
+    art.innerHTML = f.poster ? `<img ${imageAttrs(f.poster, '(max-width: 760px) 92vw, 32vw')} alt="${esc(f.title)} poster" width="${w}" height="${h}" loading="lazy" decoding="async">` : slate(f);
     const media = art.firstElementChild;
     $('.archive-preview-meta', preview).textContent = `${f.year} / ${f.roles.join(' · ')}`;
     $('h3', preview).textContent = f.title;
@@ -178,7 +227,10 @@
     if (narrow.matches && row) row.after(preview);
     else if (!narrow.matches && preview.parentElement !== browser) browser.append(preview);
   }
-  narrow.addEventListener('change', () => { placePreview(null); refresh(); });
+  narrow.addEventListener('change', () => {
+    placePreview(rows.find(r => r.dataset.film === previewId && !r.hidden));
+    refresh();
+  });
 
   function applyFilter(filter, animate) {
     let count = 0;
@@ -188,6 +240,14 @@
       if (show) count++;
     });
     $('#count').textContent = pad(count);
+    if ($('#filter-status')) $('#filter-status').textContent = `${count} films shown${filter === 'all' ? '' : ' for ' + filter}`;
+    const selectedRow = rows.find(r => r.dataset.film === previewId && !r.hidden);
+    const nextRow = selectedRow || rows.find(r => !r.hidden);
+    preview.hidden = !nextRow;
+    if (nextRow) {
+      if (!selectedRow) showPreview(nextRow.dataset.film, false);
+      placePreview(nextRow);
+    }
     if (animate && motion) gsap.fromTo(rows.filter(r => !r.hidden), {autoAlpha: 0, y: 16}, {autoAlpha: 1, y: 0, duration: .5, ease: 'power3.out', stagger: .03, overwrite: true});
     if (animate) refresh();
   }
@@ -257,6 +317,7 @@
     const face = $(`.spot[data-index="${i}"] .spot-play`);
     if (!v || !face) return;
     stopSpot();
+    $$('video.screen-media').forEach(v => v.pause());
     let frame;
     if (v.type === 'file') {
       frame = Object.assign(document.createElement('video'), {src: v.src, controls: true, autoplay: true, playsInline: true});
@@ -291,8 +352,8 @@
         <div class="${f.format === '9:16' ? 'phone' : 'cinema'}">
           <button class="screen" type="button" data-ai="${f.id}" data-cursor="Play" aria-label="Watch ${esc(f.title)} with sound">
             ${f.loop
-              ? `<video class="screen-media" muted loop playsinline preload="metadata" poster="${esc(f.poster)}" data-src="${esc(f.loop)}"></video>`
-              : `<img class="screen-media" src="${esc(f.poster)}" alt="" loading="lazy" decoding="async">`}
+              ? `<video class="screen-media" muted loop playsinline preload="none" poster="${esc(optimizedPoster(f.poster))}" data-src="${esc(f.loop)}"></video>`
+              : `<img class="screen-media" ${imageAttrs(f.poster, '(max-width: 760px) 92vw, 48vw')} alt="" loading="lazy" decoding="async">`}
             ${playIcon}
           </button>
         </div>
@@ -311,11 +372,11 @@
     // Silent loops play only while on screen (and not at all for reduced motion).
     $$('video.screen-media', screensEl).forEach(v => {
       v.muted = true;
-      if (reducedMotion || !('IntersectionObserver' in window)) { v.preload = 'none'; return; }
+      if (reducedMotion || navigator.connection?.saveData || !('IntersectionObserver' in window)) { v.preload = 'none'; return; }
       new IntersectionObserver(([e]) => {
         if (e.isIntersecting) {
           if (!v.src) v.src = v.dataset.src;
-          v.play().catch(() => {});
+          if (!playing && !$('#vbox')?.open) v.play().catch(() => {});
         } else v.pause();
       }, {rootMargin: '15% 0px'}).observe(v);
     });
@@ -329,10 +390,13 @@
     const f = aiFilms.find(x => x.id === id);
     if (!f || !vbox) return;
     vboxOpener = from || null;
+    stopSpot();
     $$('video.screen-media').forEach(v => v.pause());
     vboxVideo.hidden = !!f.youtube;
     vboxFrame.hidden = !f.youtube;
     vbox.classList.toggle('is-vertical', f.format === '9:16');
+    vboxFrame.title = f.title;
+    vboxVideo.setAttribute('aria-label', f.title);
     if (f.youtube) vboxFrame.src = `https://www.youtube-nocookie.com/embed/${f.youtube}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     else Object.assign(vboxVideo, {src: f.full, poster: f.poster});
     vbox.showModal();
@@ -366,15 +430,17 @@
 
   function openDetail(f, from) {
     if (!f || !dialog) return;
+    stopSpot();
+    $$('video.screen-media').forEach(v => v.pause());
     opener = from || null;
     const img = f.poster || f.image;
-    const art = img ? `<div class="detail-poster"><img src="${img}" alt="${esc(f.title)}"></div>` : f.roles ? `<div class="detail-poster">${slate(f)}</div>` : '';
+    const art = img ? `<div class="detail-poster"><img ${imageAttrs(img, '(max-width: 900px) 92vw, 600px')} alt="${esc(f.title)}" decoding="async"></div>` : f.roles ? `<div class="detail-poster">${slate(f)}</div>` : '';
     const facts = [
       ['Role', f.roles ? f.roles.join(' / ') : f.role], ['Version editing', f.versionEditing], ['Language versions', f.languageVersions],
-      ['Director', f.director], ['Cast', f.cast], ['Production', f.production || f.client], ['Awards', f.award]
+      ['Director', f.director], ['Cast', f.cast], ['Production', f.production || f.client], ['Film awards', f.award]
     ].filter(x => x[1]);
     detailContent.innerHTML = `${art}
-      <div class="detail-copy"><span class="mono">${esc(f.year)} / ${esc([f.badge && /short|music/i.test(f.badge) ? f.badge : '', f.language].filter(Boolean).join(' · ') || f.badge)}</span><h2 id="detail-title">${esc(f.title)}</h2><p>${esc(f.description)}</p><dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
+      <div class="detail-copy"><span class="mono">${esc(f.year)} / ${esc([f.badge && /short|music/i.test(f.badge) ? f.badge : '', f.language].filter(Boolean).join(' · ') || f.badge)}</span><h2 id="detail-title">${esc(f.title)}</h2><p>${esc(f.description)}</p><dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl><button class="text-link project-share" type="button" data-share="${esc(f.id)}">Copy project link ↗</button><span class="share-status sr-only" role="status"></span></div>`;
     detailContent.classList.toggle('without-poster', !art);
     const pic = $('.detail-poster img', detailContent);
     pic?.addEventListener('error', () => {
@@ -410,6 +476,18 @@
   });
 
   document.addEventListener('click', e => {
+    const share = e.target.closest('[data-share]');
+    if (share) {
+      const url = new URL(location.href);
+      url.searchParams.set('film', share.dataset.share);
+      url.hash = 'selected';
+      const status = $('.share-status');
+      if (!navigator.clipboard) { status.textContent = 'Copy this address: ' + url.href; status.classList.remove('sr-only'); return; }
+      navigator.clipboard.writeText(url.href).then(() => {
+        share.textContent = 'Link copied ✓'; status.textContent = 'Project link copied';
+      }).catch(() => { status.textContent = 'Copy this address: ' + url.href; status.classList.remove('sr-only'); });
+      return;
+    }
     const row = e.target.closest('.archive-row');
     if (row) {
       showPreview(row.dataset.film, true);
@@ -418,7 +496,7 @@
       return;
     }
     const hit = e.target.closest('[data-film]');
-    if (hit) return openDetail(findFilm(hit.dataset.film), hit);
+    if (hit) { e.preventDefault(); return openDetail(findFilm(hit.dataset.film), hit); }
     const more = e.target.closest('.preview-open');
     if (more) openDetail(findFilm(previewId), more);
   });
@@ -433,7 +511,7 @@
   }
   // The viewfinder timecode runs while the opening frame is on screen.
   const frameTc = $('#frame-tc');
-  if (frameTc && !reducedMotion && 'IntersectionObserver' in window) {
+  if (frameTc && finePointer && !reducedMotion && 'IntersectionObserver' in window) {
     const start = performance.now();
     let raf = 0, last = -1;
     const run = now => {
@@ -454,6 +532,8 @@
     $('.loader')?.remove();
     nativeReel();
   }
+  const linkedFilm = findFilm(new URL(location.href).searchParams.get('film'));
+  if (linkedFilm) openDetail(linkedFilm, null);
 
   /* =====================================================================
      Motion
@@ -471,13 +551,19 @@
 
     // In-page links glide instead of jumping.
     document.addEventListener('click', e => {
+      if (e.defaultPrevented) return;
       const a = e.target.closest('a[href^="#"]');
       if (!a) return;
       const id = a.getAttribute('href').slice(1);
       const target = id === 'home' || !id ? 0 : document.getElementById(id);
       if (target === null) return;
       e.preventDefault();
-      lenis.scrollTo(target, {duration: 1.8, easing: t => 1 - Math.pow(1 - t, 4), onComplete: () => target && target.focus?.({preventScroll: true})});
+      history.pushState(null, '', `#${id || 'home'}`);
+      lenis.scrollTo(target, {duration: 1, easing: t => 1 - Math.pow(1 - t, 4), onComplete: () => target && target.focus?.({preventScroll: true})});
+    });
+    addEventListener('popstate', () => {
+      const target = document.getElementById(location.hash.slice(1)) || 0;
+      lenis.scrollTo(target, {immediate:true});
     });
 
     const header = $('.site-header');
@@ -519,7 +605,7 @@
         section.style.removeProperty('--clip-h');
         const media = $('.reel-media', track);
         const pin = getComputedStyle(reelPin);
-        const used = $('.reel-head').offsetHeight + $('.reel-stage').offsetHeight + $('.reel-readout').offsetHeight + parseFloat(pin.paddingTop) + parseFloat(pin.paddingBottom);
+        const used = $('.reel-head').offsetHeight + $('.reel-stage').offsetHeight + $('.reel-readout').offsetHeight + $('.reel-controls').offsetHeight + parseFloat(pin.paddingTop) + parseFloat(pin.paddingBottom);
         const over = used - innerHeight;
         if (over > 0 && media) section.style.setProperty('--clip-h', `${Math.max(180, media.offsetHeight + 24 - over - 8)}px`);
       };
@@ -528,8 +614,14 @@
       const pick = () => setActive(nearestClip(-gsap.getProperty(track, 'x') + viewport.clientWidth / 2));
       const tween = gsap.to(track, {
         x: () => -dist, ease: 'none',
-        scrollTrigger: {trigger: reelPin, start: () => reelPin.offsetHeight < innerHeight ? 'center center' : 'top top', end: () => `+=${dist * .9}`, pin: true, scrub: true, invalidateOnRefresh: true, onRefreshInit: measure, onUpdate: pick, onRefresh: pick}
+        scrollTrigger: {trigger: reelPin, start: () => reelPin.offsetHeight < innerHeight ? 'center center' : 'top top', end: () => `+=${Math.min(dist * .6, innerHeight * 3)}`, pin: true, scrub: .35, invalidateOnRefresh: true, onRefreshInit: measure, onUpdate: pick, onRefresh: pick}
       });
+      seekReel = i => {
+        if (!reelClips[i] || !dist) return;
+        const st = tween.scrollTrigger;
+        const x = clipCenters[i] - viewport.clientWidth / 2;
+        lenis.scrollTo(st.start + gsap.utils.clamp(0, 1, x / dist) * (st.end - st.start), {duration: .65});
+      };
       pick();
       // Keyboard users tabbing through the posters get each one brought under the playhead.
       const onFocus = e => {
@@ -541,6 +633,9 @@
       };
       viewport.addEventListener('focusin', onFocus);
       return () => {
+        seekReel = i => {
+          if (reelClips[i]) viewport.scrollTo({left: clipCenters[i] - viewport.clientWidth / 2, behavior: reducedMotion ? 'instant' : 'smooth'});
+        };
         viewport.removeEventListener('focusin', onFocus);
         section.classList.remove('reel--pinned');
         section.style.removeProperty('--clip-h');
@@ -549,12 +644,22 @@
     });
 
     /* --- Section furniture --- */
+    $$('.selected-card').forEach((card, i) => {
+      gsap.from(card, {y: 48, autoAlpha: 0, duration: 1, delay: i * .08, ease: 'power3.out', scrollTrigger: {trigger: '.selected-grid', start: 'top 85%', once: true}});
+    });
     $$('.rule').forEach(r => gsap.fromTo(r, {scaleX: 0}, {scaleX: 1, duration: 1.6, ease: 'expo.inOut', scrollTrigger: {trigger: r.parentElement, start: 'top 90%', once: true}}));
     $$('.section-top').forEach(t => gsap.from($$(':scope > span', t), {y: 14, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: t, start: 'top 90%', once: true}}));
-    $$('[data-split]').forEach(el => SplitText.create(el, {
+    $$('[data-split]').forEach(el => {
+      // Phones keep the reveal without creating masks around every text line.
+      if (narrow.matches) {
+        gsap.from(el, {y:16, autoAlpha:0, duration:.7, ease:'power3.out', scrollTrigger:{trigger:el, start:'top 90%', once:true}});
+        return;
+      }
+      SplitText.create(el, {
       type: 'lines', linesClass: 'split-line', mask: 'lines', autoSplit: true,
       onSplit: self => gsap.from(self.lines, {yPercent: 115, duration: 1.3, ease: 'expo.out', stagger: .09, scrollTrigger: {trigger: el, start: 'top 86%', once: true}})
-    }));
+      });
+    });
     $$('[data-fade]').forEach(el => gsap.from(el, {y: 24, autoAlpha: 0, duration: 1.1, ease: 'power3.out', scrollTrigger: {trigger: el, start: 'top 88%', once: true}}));
 
     /* --- Upcoming posters: wipe in, then drift --- */
@@ -674,36 +779,38 @@
     ScrollTrigger.sort();
     document.fonts?.ready.then(() => ScrollTrigger.refresh());
     addEventListener('load', () => {
-      $$('.reel-clip img, .feature img').forEach(img => { img.loading = 'eager'; });
       ScrollTrigger.refresh();
     });
 
     const loader = $('.loader');
     const hashTarget = location.hash.length > 1 ? document.getElementById(location.hash.slice(1)) : null;
-    if (hashTarget || !loader) {
+    if (hashTarget || new URL(location.href).searchParams.has('film') || !loader) {
       loader?.remove();
       heroIntro().progress(1);
       if (hashTarget) document.fonts?.ready.then(() => { ScrollTrigger.refresh(); lenis.scrollTo(hashTarget, {immediate: true, force: true}); });
       return;
     }
 
+    let seenOpening = false;
+    try { seenOpening = sessionStorage.getItem('achu-opening-seen') === 'true'; sessionStorage.setItem('achu-opening-seen', 'true'); } catch {}
+    if (seenOpening) { loader?.remove(); heroIntro(); return; }
     scrollTo(0, 0);
     lenis.stop();
     (async () => {
       const tc = $('.loader-tc');
       const count = {f: 0};
-      const ready = Promise.race([Promise.all([document.fonts?.ready, imgReady(heroImg)]), wait(2600)]);
+      const ready = Promise.race([Promise.all([document.fonts?.ready, imgReady(heroImg)]), wait(1200)]);
       await gsap.timeline()
-        .from('.loader-inner > *', {autoAlpha: 0, y: 12, duration: .6, ease: 'power3.out', stagger: .06})
-        .to(count, {f: 47, duration: 1.3, ease: 'power2.inOut', onUpdate: () => { tc.textContent = timecode(Math.round(count.f)); }}, .1)
-        .to('.loader-line i', {scaleX: 1, duration: 1.3, ease: 'power2.inOut'}, .1);
+        .from('.loader-inner > *', {autoAlpha: 0, y: 12, duration: .3, ease: 'power3.out', stagger: .03})
+        .to(count, {f: 23, duration: .65, ease: 'power2.inOut', onUpdate: () => { tc.textContent = timecode(Math.round(count.f)); }}, .05)
+        .to('.loader-line i', {scaleX: 1, duration: .65, ease: 'power2.inOut'}, .05);
       await ready;
       gsap.timeline({onComplete: () => loader.remove()})
-        .to('.loader-inner', {autoAlpha: 0, y: -16, duration: .45, ease: 'power2.in'})
-        .to('.loader-panel--top', {yPercent: -100, duration: 1.2, ease: 'expo.inOut'}, '-=.05')
-        .to('.loader-panel--bottom', {yPercent: 100, duration: 1.2, ease: 'expo.inOut'}, '<')
-        .add(heroIntro(), '<.4')
-        .call(() => lenis.start(), null, 1.2);
+        .to('.loader-inner', {autoAlpha: 0, y: -16, duration: .2, ease: 'power2.in'})
+        .to('.loader-panel--top', {yPercent: -100, duration: .65, ease: 'expo.inOut'}, '-=.05')
+        .to('.loader-panel--bottom', {yPercent: 100, duration: .65, ease: 'expo.inOut'}, '<')
+        .add(heroIntro(), '<.2')
+        .call(() => { if (!dialog?.open && !vbox?.open) lenis.start(); }, null, .7);
     })();
   }
 })();

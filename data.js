@@ -364,11 +364,11 @@ const TV_COMMERCIALS = [
 const AI_FILMS = [
   { id: "tarmac", title: "My Storage Space — Tarmac", type: "AI brand film", format: "9:16", duration: "1:10", role: "AI filmmaker & editor",
     credit: "Storyboard to screen — every frame generated, every cut mine.",
-    loop: "assets/video/tarmac-loop.mp4", full: "assets/video/tarmac.mp4", poster: "assets/video/tarmac-poster.jpg" },
+    loop: "assets/video/tarmac-preview.mp4", full: "assets/video/tarmac.mp4", poster: "assets/video/tarmac-poster.jpg" },
   { id: "fashion-studio", title: "Fashion Studio", type: "AI fashion film", format: "16:9", duration: "0:30", role: "AI filmmaker & editor",
     credit: "The looks, the cities, the light — all generated. The rhythm is mine.",
-    loop: "assets/video/fashion-loop.mp4", full: "assets/video/fashion.mp4", poster: "assets/video/fashion-poster.jpg" },
+    loop: "assets/video/fashion-preview.mp4", full: "assets/video/fashion.mp4", poster: "assets/video/fashion-poster.jpg" },
   { id: "cathay-student-fare", title: "Cathay Pacific — Student Fare", type: "AI brand film", format: "16:9", duration: "1:07", role: "AI filmmaker, VFX & editor",
     credit: "Generated, composited and cut — from the first frame to the final grade.",
-    loop: "assets/video/cathay-loop.mp4", full: "assets/video/cathay.mp4", poster: "assets/video/cathay-poster.jpg" }
+    loop: "assets/video/cathay-preview.mp4", full: "assets/video/cathay.mp4", poster: "assets/video/cathay-poster.jpg" }
 ];
