@@ -137,27 +137,6 @@ h2 em{letter-spacing:-.025em}
 .scroll-cue:hover{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .hero-note{grid-column:3;justify-self:end;text-align:right;color:var(--muted);font-size:14px;line-height:1.5}
 
-/* ---------- Upcoming work: release sheets (poster + synopsis + credits) ---------- */
-.upcoming{border-top:1px solid var(--line)}
-.feature{display:grid;grid-template-columns:auto minmax(0,1fr);gap:clamp(36px,6vw,104px);align-items:center;padding:clamp(40px,6vw,88px) 0;border-bottom:1px solid var(--line)}
-.feature-media{position:relative;display:block;width:clamp(200px,min(34vw,calc((100svh - 260px) * .75)),400px);aspect-ratio:3/4;background:var(--surface);box-shadow:0 30px 70px rgba(0,0,0,.4)}
-.feature-clip{position:absolute;inset:0;overflow:hidden}
-.feature-zoom{position:absolute;inset:0;display:block}
-.feature-zoom img{width:100%;height:100%;object-fit:cover;transition:transform 1.2s var(--ease)}
-.feature-media:hover .feature-zoom img{transform:scale(1.03)}
-.feature-copy{display:flex;flex-direction:column;align-items:flex-start;max-width:640px}
-.feature-top{display:flex;align-items:center;gap:24px;width:100%;padding-bottom:18px;border-bottom:1px solid var(--line);color:var(--muted)}
-.feature-top span:last-child{margin-left:auto}
-.feature-status{display:inline-flex;align-items:center;gap:9px;color:var(--fg)}
-.feature-status i{width:7px;height:7px;border-radius:50%;background:currentColor;animation:blink 2.4s ease-in-out infinite}
-.feature-title{margin:28px 0 18px;font-size:clamp(40px,4.6vw,84px);font-weight:500;letter-spacing:-.05em;line-height:.95}
-.feature-desc{max-width:54ch;color:var(--muted);font-size:clamp(15px,1.1vw,17px);line-height:1.75}
-.feature-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 32px;width:100%;margin:30px 0 32px;padding-top:24px;border-top:1px solid var(--line)}
-.feature-facts div{min-width:0}
-.feature-facts div:last-child:nth-child(odd){grid-column:1 / -1}
-.feature-facts dt{font:400 11px/1.8 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.feature-facts dd{margin:4px 0 0;font-size:15px;line-height:1.45}
-
 /* ---------- Film archive reel (horizontal timeline) ---------- */
 .reel{--clip-h:clamp(220px,36svh,380px)}
 /* The archive block is only as tall as its content; while pinned it sits centred on screen,
@@ -408,7 +387,6 @@ footer{display:flex;justify-content:space-between;gap:16px 24px;flex-wrap:wrap;p
   .tvc-brief{grid-template-columns:1fr;gap:32px}
   .tvc-beats li{grid-template-columns:32px 1fr;gap:4px 12px}
   .tvc-beats li>span:last-child{grid-column:2}
-  .feature{grid-template-columns:1fr;gap:28px;padding:40px 0}
   .tvc-grid{grid-template-columns:1fr}
   .ai-process{grid-template-columns:1fr}
   .ai-process li,.ai-process li+li{padding:20px 0;border-left:0;border-bottom:1px solid var(--line)}
@@ -420,8 +398,6 @@ footer{display:flex;justify-content:space-between;gap:16px 24px;flex-wrap:wrap;p
   .screen-info .pill{grid-row:auto;grid-column:2;justify-self:start;margin-top:10px;order:1}
   .spot-info{grid-template-columns:1fr}
   .spot-role{text-align:left}
-  .feature-media{width:min(100%,340px)}
-  .feature-title{margin:22px 0 14px}
   .reel{--clip-h:min(50svh,360px)}
   .reel-title-row{display:block}
   .reel-note{margin-top:16px}
@@ -476,7 +452,6 @@ footer{display:flex;justify-content:space-between;gap:16px 24px;flex-wrap:wrap;p
   .nav{gap:12px;font-size:11px}
   .nav-cta{padding:6px 10px}
   h2{font-size:clamp(36px,11.5vw,46px)}
-  .feature-title{font-size:36px}
   .filters button{padding:8px 12px;font-size:11px}
 }
 

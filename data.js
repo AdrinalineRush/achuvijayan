@@ -355,6 +355,12 @@ const TV_COMMERCIALS = [
   { title: "Pappai Ice Cream", brand: "Pappai", year: "2017", duration: "0:30", role: "Editor", video: "https://youtu.be/VFSJlloIPgc", poster: "" }
 ];
 
+// Titles and credits from the official JOY MUSIC and Zee Music Company uploads.
+const MUSIC_VIDEOS = [
+  { title: "Smaranayil", brand: "JOY MUSIC", year: "2023", duration: "7:37", language: "Tamil", role: "Director & Editor", video: "https://youtu.be/pquXVBaEgHg", poster: "" },
+  { title: "Tu Hi Hai Meri Zindagi", brand: "Zee Music Company", year: "2021", duration: "5:37", language: "Hindi / Malayalam", role: "Edit & DI", video: "https://youtu.be/AQcWnjii3vQ", poster: "" }
+];
+
 /**
  * Fully AI films, shown as screens in "05 / AI filmmaking".
  * A 9:16 film goes on the phone; 16:9 films go on cinema screens.

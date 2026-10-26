@@ -29,10 +29,9 @@ The server disables caching and supports video byte ranges for seeking.
 
 ## Editing content
 
-Edit `FEATURE_FILMS`, `TV_COMMERCIALS` or `AI_FILMS` in `data.js`.
+Edit `FEATURE_FILMS`, `TV_COMMERCIALS`, `MUSIC_VIDEOS` or `AI_FILMS` in `data.js`.
 Keep the three static selected-film cards and the static filmography fallback in
-`index.html` consistent with changes to credits. Upcoming IDs are in `UPCOMING`
-in `app.js`.
+`index.html` consistent with changes to credits.
 
 After adding or changing artwork:
 

@@ -1,5 +1,5 @@
 /* Achu Vijayan — portfolio behaviour.
-   Renders the films, commercials and AI films from data.js, runs the archive browser and the
+   Renders films, commercials, music videos and AI films, runs the archive browser and the
    detail dialog, then (unless the visitor prefers reduced motion) adds smooth scrolling and
    the scroll-driven sequences with GSAP + ScrollTrigger + SplitText + Lenis. */
 (() => {
@@ -11,8 +11,8 @@
   const pad = n => String(n).padStart(2, '0');
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const imgReady = img => !img || img.complete ? Promise.resolve() : new Promise(r => {
-    img.addEventListener('load', r, {once: true});
-    img.addEventListener('error', r, {once: true});
+    img.addEventListener('load', r, {toggleActions: 'play none none none'});
+    img.addEventListener('error', r, {toggleActions: 'play none none none'});
   });
   // 24 fps timecode, HH:MM:SS:FF.
   const timecode = frames => {
@@ -96,26 +96,6 @@
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => ScrollTrigger.refresh(), 120);
   };
-
-  /* ---------- Upcoming work: a release sheet per film ---------- */
-  const UPCOMING = ['house-for-sale', 'boom-bang'];
-  const upcomingEl = $('#upcoming');
-  if (upcomingEl) upcomingEl.innerHTML = UPCOMING.map(findFilm).filter(Boolean).map((f, i, all) => {
-    const [w, h] = posterSize(f.poster);
-    const facts = [['Role', f.roles.join(' / ')], ['Language', f.language], ['Director', f.director], ['Production', f.production], ['Cast', f.cast]].filter(x => x[1]);
-    return `<article class="feature">
-      <button class="feature-media" type="button" data-film="${f.id}" data-cursor="View" aria-label="View details: ${esc(f.title)}">
-        <span class="feature-clip"><span class="feature-zoom"><img ${imageAttrs(f.poster, '(max-width: 760px) 85vw, 400px')} alt="${esc(f.title)} film poster" width="${w}" height="${h}" loading="lazy" decoding="async"></span></span>
-      </button>
-      <div class="feature-copy">
-        <div class="feature-top mono"><span>${pad(i + 1)} / ${pad(all.length)}</span><span class="feature-status"><i></i>${esc(f.badge)}</span><span>${esc(f.year)}</span></div>
-        <h3 class="feature-title">${esc(f.title)}</h3>
-        <p class="feature-desc">${esc(f.description)}</p>
-        <dl class="feature-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-        <button class="pill feature-more" type="button" data-film="${f.id}">Full credits <span aria-hidden="true">↗</span></button>
-      </div>
-    </article>`;
-  }).join('');
 
   /* ---------- Film archive reel: oldest to newest, like clips on a timeline ---------- */
   const chrono = [...films].reverse();
@@ -263,8 +243,10 @@
   if (defaultFilm) showPreview(defaultFilm.id, false);
   applyFilter('all', false);
 
-  /* ---------- TV commercials: four click-to-play players ---------- */
-  const spots = typeof TV_COMMERCIALS !== 'undefined' ? TV_COMMERCIALS : [];
+  /* ---------- Commercials and music videos: shared click-to-play players ---------- */
+  const commercials = typeof TV_COMMERCIALS !== 'undefined' ? TV_COMMERCIALS : [];
+  const musicVideos = typeof MUSIC_VIDEOS !== 'undefined' ? MUSIC_VIDEOS : [];
+  const spots = [...commercials, ...musicVideos];
   // Accepts YouTube (watch / youtu.be / shorts / embed), Vimeo (incl. unlisted hash) or a direct video file.
   const parseVideo = url => {
     const u = String(url || '').trim();
@@ -275,11 +257,12 @@
     return null;
   };
   const tvcGrid = $('#tvc-grid');
-  if (tvcGrid) tvcGrid.innerHTML = spots.map((c, i) => {
+  const renderSpots = (collection, offset = 0, category = 'TV commercial') => collection.map((c, localIndex) => {
+    const i = offset + localIndex;
     const v = parseVideo(c.video);
     const poster = c.poster || v?.thumb || '';
     const title = c.title || 'Title to come';
-    const tag = `<span class="spot-tag mono">${pad(i + 1)} / ${pad(spots.length)}</span>`;
+    const tag = `<span class="spot-tag mono">${pad(localIndex + 1)} / ${pad(collection.length)}</span>`;
     const fallback = !c.poster && v?.fallback ? ` data-fallback="${v.fallback}"` : '';
     const art = poster ? `<img class="spot-poster" src="${esc(poster)}" alt="" loading="lazy" decoding="async"${fallback}>` : '<span class="spot-placeholder" aria-hidden="true"></span>';
     const face = v
@@ -288,12 +271,15 @@
     return `<article class="spot" data-index="${i}">
       <div class="spot-player">${face}</div>
       <div class="spot-info">
-        <span class="spot-meta mono">${esc([c.year, c.duration].filter(Boolean).join(' · ') || 'TV commercial')}</span>
+        <span class="spot-meta mono">${esc([c.year, c.duration, c.language].filter(Boolean).join(' · ') || category)}</span>
         <h3 class="spot-title">${esc(title)}</h3>
         ${c.role ? `<span class="spot-role mono">${esc(c.role)}</span>` : ''}
       </div>
     </article>`;
   }).join('');
+  if (tvcGrid) tvcGrid.innerHTML = renderSpots(commercials);
+  const musicGrid = $('#music-grid');
+  if (musicGrid) musicGrid.innerHTML = renderSpots(musicVideos, commercials.length, 'Music video');
 
   // YouTube answers a missing HD thumbnail with a 120px grey placeholder rather than an error,
   // so fall back to the standard thumbnail in either case.
@@ -304,7 +290,7 @@
     if (img.complete && img.naturalWidth && img.naturalWidth < 200) swap();
   });
 
-  // The real player is only created on play, so the page never loads four video embeds up front.
+  // Embeds load only on play; commercials and music videos share one active player.
   let playing = null;
   function stopSpot() {
     if (!playing) return;
@@ -445,7 +431,7 @@
     const pic = $('.detail-poster img', detailContent);
     pic?.addEventListener('error', () => {
       pic.parentElement.replaceWith(Object.assign(document.createElement('p'), {className: 'image-unavailable', textContent: 'Poster unavailable.'}));
-    }, {once: true});
+    }, {toggleActions: 'play none none none'});
     dialog.showModal();
     lock(true);
     if (motion) {
@@ -543,6 +529,9 @@
     root.classList.add('motion');
     ScrollTrigger.config({ignoreMobileResize: true});
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    // Build all triggers from the top before restoring an anchor. Initializing
+    // at a restored deep scroll can retire one-time triggers during pin setup.
+    scrollTo({top: 0, left: 0, behavior: 'instant'});
 
     lenis = new Lenis({lerp: .085, smoothWheel: true});
     lenis.on('scroll', ScrollTrigger.update);
@@ -645,63 +634,60 @@
 
     /* --- Section furniture --- */
     $$('.selected-card').forEach((card, i) => {
-      gsap.from(card, {y: 48, autoAlpha: 0, duration: 1, delay: i * .08, ease: 'power3.out', scrollTrigger: {trigger: '.selected-grid', start: 'top 85%', once: true}});
+      gsap.from(card, {y: 48, autoAlpha: 0, duration: 1, delay: i * .08, ease: 'power3.out', scrollTrigger: {trigger: '.selected-grid', start: 'top 85%', toggleActions: 'play none none none'}});
     });
-    $$('.rule').forEach(r => gsap.fromTo(r, {scaleX: 0}, {scaleX: 1, duration: 1.6, ease: 'expo.inOut', scrollTrigger: {trigger: r.parentElement, start: 'top 90%', once: true}}));
-    $$('.section-top').forEach(t => gsap.from($$(':scope > span', t), {y: 14, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: t, start: 'top 90%', once: true}}));
+    $$('.rule').forEach(r => gsap.fromTo(r, {scaleX: 0}, {scaleX: 1, duration: 1.6, ease: 'expo.inOut', scrollTrigger: {trigger: r.parentElement, start: 'top 90%', toggleActions: 'play none none none'}}));
+    $$('.section-top').forEach(t => gsap.from($$(':scope > span', t), {y: 14, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: t, start: 'top 90%', toggleActions: 'play none none none'}}));
     $$('[data-split]').forEach(el => {
       // Phones keep the reveal without creating masks around every text line.
       if (narrow.matches) {
-        gsap.from(el, {y:16, autoAlpha:0, duration:.7, ease:'power3.out', scrollTrigger:{trigger:el, start:'top 90%', once:true}});
+        gsap.from(el, {y:16, autoAlpha:0, duration:.7, ease:'power3.out', scrollTrigger:{trigger:el, start:'top 90%', toggleActions: 'play none none none'}});
         return;
       }
       SplitText.create(el, {
       type: 'lines', linesClass: 'split-line', mask: 'lines', autoSplit: true,
-      onSplit: self => gsap.from(self.lines, {yPercent: 115, duration: 1.3, ease: 'expo.out', stagger: .09, scrollTrigger: {trigger: el, start: 'top 86%', once: true}})
+      onSplit: self => gsap.from(self.lines, {yPercent: 115, duration: 1.3, ease: 'expo.out', stagger: .09, scrollTrigger: {trigger: el, start: 'top 86%', toggleActions: 'play none none none'}})
       });
     });
-    $$('[data-fade]').forEach(el => gsap.from(el, {y: 24, autoAlpha: 0, duration: 1.1, ease: 'power3.out', scrollTrigger: {trigger: el, start: 'top 88%', once: true}}));
-
-    /* --- Upcoming posters: wipe in, then drift --- */
-    $$('.feature').forEach(card => {
-      gsap.timeline({scrollTrigger: {trigger: card, start: 'top 80%', once: true}})
-        .fromTo($('.feature-clip', card), {clipPath: 'inset(100% 0% 0% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.4, ease: 'expo.inOut'})
-        .fromTo($('.feature-zoom', card), {scale: 1.12}, {scale: 1, duration: 1.8, ease: 'expo.out'}, .2)
-        .from($$('.feature-copy > *', card), {y: 24, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08}, .45);
-    });
+    $$('[data-fade]').forEach(el => gsap.from(el, {y: 24, autoAlpha: 0, duration: 1.1, ease: 'power3.out', scrollTrigger: {trigger: el, start: 'top 88%', toggleActions: 'play none none none'}}));
 
     /* --- Filmography list --- */
     gsap.set(rows, {autoAlpha: 0, y: 24});
-    ScrollTrigger.batch(rows, {start: 'top 94%', once: true, onEnter: batch => gsap.to(batch, {autoAlpha: 1, y: 0, duration: .8, ease: 'power3.out', stagger: .05, overwrite: true})});
-    gsap.from('.archive-preview', {autoAlpha: 0, y: 40, duration: 1.2, ease: 'expo.out', scrollTrigger: {trigger: '.archive-browser', start: 'top 80%', once: true}});
+    const revealedRows = new WeakSet();
+    ScrollTrigger.batch(rows, {start: 'top 94%', onEnter: batch => {
+      const fresh = batch.filter(row => !revealedRows.has(row));
+      fresh.forEach(row => revealedRows.add(row));
+      if (fresh.length) gsap.to(fresh, {autoAlpha: 1, y: 0, duration: .8, ease: 'power3.out', stagger: .05, overwrite: true});
+    }});
+    gsap.from('.archive-preview', {autoAlpha: 0, y: 40, duration: 1.2, ease: 'expo.out', scrollTrigger: {trigger: '.archive-browser', start: 'top 80%', toggleActions: 'play none none none'}});
 
     /* --- About: the page turns to paper --- */
     ScrollTrigger.create({trigger: '#about', start: 'top 55%', end: 'bottom 45%', onToggle: s => { document.body.dataset.theme = s.isActive ? 'light' : 'dark'; }});
     gsap.to('.asterisk', {rotate: 360, ease: 'none', scrollTrigger: {trigger: '#about', start: 'top bottom', end: 'bottom top', scrub: true}});
-    gsap.from('.disciplines li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: '.disciplines', start: 'top 88%', once: true}});
+    gsap.from('.disciplines li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: '.disciplines', start: 'top 88%', toggleActions: 'play none none none'}});
 
     /* --- TV commercials: the count runs up once the brief is in view --- */
     const tvcCount = $('.tvc-count');
     if (tvcCount) {
       const n = {v: 0};
-      gsap.to(n, {v: +tvcCount.dataset.count, duration: 2, ease: 'power3.out', scrollTrigger: {trigger: '.tvc-stat', start: 'top 85%', once: true},
+      gsap.to(n, {v: +tvcCount.dataset.count, duration: 2, ease: 'power3.out', scrollTrigger: {trigger: '.tvc-stat', start: 'top 85%', toggleActions: 'play none none none'},
         onStart: () => { tvcCount.textContent = '0'; }, onUpdate: () => { tvcCount.textContent = Math.round(n.v); }});
     }
 
-    gsap.from('.tvc-beats li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .09, scrollTrigger: {trigger: '.tvc-beats', start: 'top 88%', once: true}});
+    gsap.from('.tvc-beats li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .09, scrollTrigger: {trigger: '.tvc-beats', start: 'top 88%', toggleActions: 'play none none none'}});
 
     /* --- TV commercials: players wipe in --- */
     $$('.spot').forEach((spot, i) => {
-      gsap.timeline({scrollTrigger: {trigger: spot, start: 'top 85%', once: true}})
+      gsap.timeline({scrollTrigger: {trigger: spot, start: 'top 85%', toggleActions: 'play none none none'}})
         .fromTo($('.spot-player', spot), {clipPath: 'inset(0% 0% 100% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.3, ease: 'expo.inOut', delay: (i % 2) * .12})
         .from($$('.spot-info > *', spot), {y: 18, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .06}, .5);
     });
 
-    gsap.from('.ai-process li', {y: 24, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .12, scrollTrigger: {trigger: '.ai-process', start: 'top 85%', once: true}});
+    gsap.from('.ai-process li', {y: 24, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .12, scrollTrigger: {trigger: '.ai-process', start: 'top 85%', toggleActions: 'play none none none'}});
 
     /* --- AI filmmaking: the screens slide in from opposite sides --- */
     if ($('.screens-stage')) {
-      const st = {trigger: '.screens-stage', start: 'top 78%', once: true};
+      const st = {trigger: '.screens-stage', start: 'top 78%', toggleActions: 'play none none none'};
       gsap.from('.screens .phone', {xPercent: -25, rotate: -6, autoAlpha: 0, duration: 1.5, ease: 'expo.out', scrollTrigger: st});
       gsap.from('.screens .cinema', {xPercent: 18, autoAlpha: 0, duration: 1.5, ease: 'expo.out', stagger: .15, scrollTrigger: st});
       gsap.from('.screen-info', {y: 20, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .1, delay: .5, scrollTrigger: st});
@@ -710,9 +696,9 @@
 
     /* --- Contact: the light floods in --- */
     gsap.fromTo('.contact-fill', {clipPath: 'circle(0% at 50% 100%)'}, {clipPath: 'circle(150% at 50% 100%)', ease: 'none', scrollTrigger: {trigger: '#contact', start: 'top bottom', end: 'top 15%', scrub: true}});
-    gsap.from('.ct-line > span', {yPercent: 115, duration: 1.4, ease: 'expo.out', stagger: .1, scrollTrigger: {trigger: '.contact-title', start: 'top 80%', once: true}});
-    gsap.from('.contact-orb', {scale: 0, rotate: -90, duration: 1.4, ease: 'expo.out', scrollTrigger: {trigger: '.contact-title', start: 'top 80%', once: true}});
-    gsap.from(['.contact-bottom > *', '#contact footer > *'], {y: 16, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .06, scrollTrigger: {trigger: '.contact-bottom', start: 'top 95%', once: true}});
+    gsap.from('.ct-line > span', {yPercent: 115, duration: 1.4, ease: 'expo.out', stagger: .1, scrollTrigger: {trigger: '.contact-title', start: 'top 80%', toggleActions: 'play none none none'}});
+    gsap.from('.contact-orb', {scale: 0, rotate: -90, duration: 1.4, ease: 'expo.out', scrollTrigger: {trigger: '.contact-title', start: 'top 80%', toggleActions: 'play none none none'}});
+    gsap.from(['.contact-bottom > *', '#contact footer > *'], {y: 16, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .06, scrollTrigger: {trigger: '.contact-bottom', start: 'top 95%', toggleActions: 'play none none none'}});
 
     /* --- Timeline HUD --- */
     const hud = $('.hud');
@@ -780,6 +766,13 @@
     document.fonts?.ready.then(() => ScrollTrigger.refresh());
     addEventListener('load', () => {
       ScrollTrigger.refresh();
+      lenis.resize();
+      const anchor = document.getElementById(location.hash.slice(1));
+      if (anchor) requestAnimationFrame(() => {
+        lenis.resize();
+        lenis.scrollTo(anchor, {immediate: true, force: true});
+        ScrollTrigger.update();
+      });
     });
 
     const loader = $('.loader');
@@ -787,7 +780,17 @@
     if (hashTarget || new URL(location.href).searchParams.has('film') || !loader) {
       loader?.remove();
       heroIntro().progress(1);
-      if (hashTarget) document.fonts?.ready.then(() => { ScrollTrigger.refresh(); lenis.scrollTo(hashTarget, {immediate: true, force: true}); });
+      if (hashTarget) (document.fonts?.ready || Promise.resolve()).then(() => {
+        ScrollTrigger.refresh();
+        lenis.resize();
+        lenis.scrollTo(hashTarget, {immediate: true, force: true});
+        ScrollTrigger.update();
+        // A direct section link should show its content immediately, including
+        // on reload when the browser restores a position past reveal triggers.
+        ScrollTrigger.getAll().forEach(trigger => {
+          if (trigger.vars.toggleActions === 'play none none none' && hashTarget.contains(trigger.trigger)) trigger.animation?.progress(1);
+        });
+      });
       return;
     }
 
