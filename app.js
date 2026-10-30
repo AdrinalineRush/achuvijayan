@@ -274,7 +274,8 @@
         <span class="spot-meta mono">${esc([c.year, c.duration, c.language].filter(Boolean).join(' · ') || category)}</span>
         <h3 class="spot-title">${esc(title)}</h3>
         ${c.role ? `<span class="spot-role mono">${esc(c.role)}</span>` : ''}
-      </div>
+        ${c.note ? `<span class="spot-note mono">${esc(c.note)}</span>` : ''}
+        ${c.description ? `<p class="spot-desc">${esc(c.description)}</p>` : ''}      </div>
     </article>`;
   }).join('');
   if (tvcGrid) tvcGrid.innerHTML = renderSpots(commercials);
@@ -297,12 +298,14 @@
     playing.frame.remove();
     playing.face.hidden = false;
     playing = null;
+    inView.forEach(startLoop);
   }
   function playSpot(i) {
     const c = spots[i], v = parseVideo(c?.video);
     const face = $(`.spot[data-index="${i}"] .spot-play`);
     if (!v || !face) return;
     stopSpot();
+    [...loops.keys()].forEach(endLoop);
     $$('video.screen-media').forEach(v => v.pause());
     let frame;
     if (v.type === 'file') {
@@ -328,6 +331,48 @@
     const play = e.target.closest('.spot-play[data-spot]');
     if (play) playSpot(+play.dataset.spot);
   });
+
+  // Music videos loop silently in their cards while on screen (not for reduced motion or Data Saver).
+  // A loop shows only once YouTube reports it playing, so its title overlay stays under the poster,
+  // and returns to its loopStart when it ends; the loops stop while a video plays with sound.
+  const loops = new Map(), inView = new Set();
+  function endLoop(card) {
+    loops.get(card)?.remove();
+    loops.delete(card);
+  }
+  function startLoop(card) {
+    const c = spots[+card.dataset.index], v = parseVideo(c?.video);
+    if (playing || loops.has(card) || v?.type !== 'youtube') return;
+    const frame = Object.assign(document.createElement('iframe'), {className: 'spot-loop', tabIndex: -1, title: ''});
+    frame.dataset.start = c.loopStart || 0;
+    frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&mute=1&start=${frame.dataset.start}&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1`;
+    frame.allow = 'autoplay; encrypted-media';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.addEventListener('load', () => frame.contentWindow?.postMessage(JSON.stringify({event: 'listening', id: card.dataset.index, channel: 'widget'}), '*'));
+    $('.spot-player', card).append(frame);
+    loops.set(card, frame);
+  }
+  addEventListener('message', e => {
+    if (!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)) return;
+    const frame = [...loops.values()].find(f => f.contentWindow === e.source);
+    let d;
+    try { d = JSON.parse(e.data); } catch { return; }
+    const state = d.event === 'onStateChange' ? d.info : d.info?.playerState;
+    if (!frame || state == null) return;
+    if (state === 1) frame.classList.add('is-live');
+    if (state === 0) {
+      const send = (func, args = []) => frame.contentWindow?.postMessage(JSON.stringify({event: 'command', func, args}), '*');
+      send('seekTo', [+frame.dataset.start, true]);
+      send('playVideo');
+    }
+  });
+  if (musicGrid && !reducedMotion && !navigator.connection?.saveData && 'IntersectionObserver' in window) {
+    const loopWatch = new IntersectionObserver(entries => entries.forEach(({target, isIntersecting}) => {
+      if (isIntersecting) { inView.add(target); startLoop(target); }
+      else { inView.delete(target); endLoop(target); }
+    }), {rootMargin: '10% 0px'});
+    $$('.spot', musicGrid).forEach(card => loopWatch.observe(card));
+  }
 
   /* ---------- AI filmmaking: films on a phone and on cinema screens ---------- */
   const aiFilms = typeof AI_FILMS !== 'undefined' ? AI_FILMS : [];

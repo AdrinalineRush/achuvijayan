@@ -355,10 +355,12 @@ const TV_COMMERCIALS = [
   { title: "Pappai Ice Cream", brand: "Pappai", year: "2017", duration: "0:30", role: "Editor", video: "https://youtu.be/VFSJlloIPgc", poster: "" }
 ];
 
-// Titles and credits from the official JOY MUSIC and Zee Music Company uploads.
+// Titles and credits from the official Muzik247, JOY MUSIC and Zee Music Company uploads.
+// loopStart (seconds) is where the silent card loop begins; the player with sound starts at 0.
 const MUSIC_VIDEOS = [
+  { title: "Manikya Malaraya Poovi", brand: "Muzik247", year: "2018", duration: "3:17", language: "Malayalam", role: "Editor", note: "Edited the most viral song in Malayalam", description: "The song crossed a million views in a few hours; the wink in the cut went viral worldwide. Now past 114 million views.", video: "https://youtu.be/W0fKl43QmIE", loopStart: 89, poster: "" },
   { title: "Smaranayil", brand: "JOY MUSIC", year: "2023", duration: "7:37", language: "Tamil", role: "Director & Editor", video: "https://youtu.be/pquXVBaEgHg", poster: "" },
-  { title: "Tu Hi Hai Meri Zindagi", brand: "Zee Music Company", year: "2021", duration: "5:37", language: "Hindi / Malayalam", role: "Edit & DI", video: "https://youtu.be/AQcWnjii3vQ", poster: "" }
+  { title: "Tu Hi Hai Meri Zindagi", brand: "Zee Music Company", year: "2021", duration: "5:37", language: "Hindi / Malayalam", role: "Edit & DI", video: "https://youtu.be/AQcWnjii3vQ", loopStart: 109, poster: "" }
 ];
 
 /**
