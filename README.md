@@ -8,7 +8,7 @@ https://achuvijayan.com. No application build step or package installation is ne
 - `index.html`: page content, selected films, static filmography fallback and sharing metadata.
 - `style.css`: responsive layout and reduced-motion rules.
 - `app.js`: film browsing, navigation, video players, dialogs and scroll animation.
-- `data.js`: filmography, commercials and AI films.
+- `data.js`: filmography, commercials, music videos, trailer cuts and AI films.
 - `image-sources.js`: generated responsive-image manifest.
 - `assets/icons/`: active logo and favicons.
 - `assets/images/`: current original artwork; `optimized/` contains generated WebP copies.
@@ -29,7 +29,7 @@ The server disables caching and supports video byte ranges for seeking.
 
 ## Editing content
 
-Edit `FEATURE_FILMS`, `TV_COMMERCIALS`, `MUSIC_VIDEOS` or `AI_FILMS` in `data.js`.
+Edit `FEATURE_FILMS`, `TV_COMMERCIALS`, `MUSIC_VIDEOS`, `TRAILER_CUTS` or `AI_FILMS` in `data.js`.
 Keep the three static selected-film cards and the static filmography fallback in
 `index.html` consistent with changes to credits.
 

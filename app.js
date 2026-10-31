@@ -246,7 +246,8 @@
   /* ---------- Commercials and music videos: shared click-to-play players ---------- */
   const commercials = typeof TV_COMMERCIALS !== 'undefined' ? TV_COMMERCIALS : [];
   const musicVideos = typeof MUSIC_VIDEOS !== 'undefined' ? MUSIC_VIDEOS : [];
-  const spots = [...commercials, ...musicVideos];
+  const trailers = typeof TRAILER_CUTS !== 'undefined' ? TRAILER_CUTS : [];
+  const spots = [...commercials, ...musicVideos, ...trailers];
   // Accepts YouTube (watch / youtu.be / shorts / embed), Vimeo (incl. unlisted hash) or a direct video file.
   const parseVideo = url => {
     const u = String(url || '').trim();
@@ -281,6 +282,8 @@
   if (tvcGrid) tvcGrid.innerHTML = renderSpots(commercials);
   const musicGrid = $('#music-grid');
   if (musicGrid) musicGrid.innerHTML = renderSpots(musicVideos, commercials.length, 'Music video');
+  const trailerGrid = $('#trailer-grid');
+  if (trailerGrid) trailerGrid.innerHTML = renderSpots(trailers, commercials.length + musicVideos.length, 'Trailer');
 
   // YouTube answers a missing HD thumbnail with a 120px grey placeholder rather than an error,
   // so fall back to the standard thumbnail in either case.
@@ -291,7 +294,7 @@
     if (img.complete && img.naturalWidth && img.naturalWidth < 200) swap();
   });
 
-  // Embeds load only on play; commercials and music videos share one active player.
+  // Embeds load only on play; commercials, music videos and trailers share one active player.
   let playing = null;
   function stopSpot() {
     if (!playing) return;

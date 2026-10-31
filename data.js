@@ -363,6 +363,14 @@ const MUSIC_VIDEOS = [
   { title: "Tu Hi Hai Meri Zindagi", brand: "Zee Music Company", year: "2021", duration: "5:37", language: "Hindi / Malayalam", role: "Edit & DI", video: "https://youtu.be/AQcWnjii3vQ", loopStart: 109, poster: "" }
 ];
 
+// Official trailers I cut, shown in "06 / Trailer cuts". Titles, runtimes and upload years from the official uploads.
+const TRAILER_CUTS = [
+  { title: "18am Padi", brand: "Goodwill Entertainments", year: "2019", duration: "2:37", language: "Malayalam", role: "Trailer Editor", description: "Official trailer. Featuring Mammootty and Prithviraj Sukumaran.", video: "https://youtu.be/22rLzgXTC8g", poster: "" },
+  { title: "Simba", brand: "Think Music India", year: "2019", duration: "2:33", language: "Tamil", role: "Trailer Editor", description: "Official trailer. Starring Bharath and Premgi Amaren.", video: "https://youtu.be/5MldVWYebik", poster: "" },
+  { title: "Oru Adaar Love", brand: "Muzik247", year: "2018", duration: "0:44", language: "Malayalam", role: "Teaser Editor", description: "Official teaser. Starring Priya Prakash Varrier and Roshan Abdul Rahoof.", video: "https://youtu.be/pC2yUlN2kMU", poster: "" },
+  { title: "White", brand: "Eros Universe Malayalam", year: "2016", duration: "1:23", language: "Malayalam", role: "Trailer Editor", description: "Official trailer. Starring Mammootty and Huma Qureshi.", video: "https://youtu.be/Xns7U46liLY", poster: "" }
+];
+
 /**
  * Fully AI films, shown as screens in "05 / AI filmmaking".
  * A 9:16 film goes on the phone; 16:9 films go on cinema screens.
