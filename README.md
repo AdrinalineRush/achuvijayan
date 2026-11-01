@@ -14,7 +14,7 @@ https://achuvijayan.com. No application build step or package installation is ne
 - `assets/images/`: current original artwork; `optimized/` contains generated WebP copies.
 - `assets/video/`: full films, short previews and their poster sources.
 - `assets/social/`: sharing card and editable SVG source.
-- `vendor/`: self-hosted GSAP, ScrollTrigger, SplitText and Lenis.
+- `vendor/`: self-hosted GSAP, ScrollTrigger, SplitText, Lenis and the Three.js logo bundle.
 - `scripts/`: local preview and image generation tools; excluded from deployment.
 - `vercel.json`: hosting and caching rules.
 
@@ -50,6 +50,60 @@ already change when the source artwork changes.
 
 Full videos load on play. Silent previews load near the viewport, except when
 reduced motion or a supported data-saving preference is active.
+
+## Appearance and motion
+
+The header's sun/moon button switches between day and night themes. Night is
+the default; a visitor's explicit choice is saved as `achu-theme` in localStorage
+and restored before the stylesheet loads. Scrolling never changes the theme.
+If storage is unavailable, switching still works for the current page.
+
+Glass surfaces use shared tokens in `style.css`, with light-theme, reduced-motion,
+reduced-transparency and no-backdrop-filter fallbacks. Large media cards use
+translucent gradients; backdrop blur is reserved for overlays. `MOTION` in
+`app.js` coordinates reveal and dialog timing. Mobile cards reveal individually
+as they enter view, and the footer retains the visitor's reduced-motion control.
+Entrances and the 300+ counter replay when their content leaves and re-enters
+the viewport from either direction. Offscreen animations finish rather than
+rewinding visible content. The hero replays on return; the loading sequence
+still runs only once per session. Scroll-scrubbed sequences follow scroll as before.
+
+The floating emblem starts in the portrait, while the small header logo stays
+in place. The hero holds for a scroll-controlled reveal: the photograph dissolves
+into the original logo contours, its A and V groups separate and assemble, and
+the image on their faces resolves into titanium, dark edges and a lime inlay.
+The finished mark holds at portrait scale for a restrained 3D turn before launch.
+Every contour comes directly from `assets/icons/logo.svg`; the geometry is not
+redrawn. The source's original corner brackets reappear late in the assembly.
+
+`logoFlightPose` gives each journey a distinct position across the viewport,
+with scale and rotation following scroll. A damped pointer attraction adds at
+most 100px horizontally and 72px vertically, plus a small idle drift. Its
+influence goes to zero at each heading and the footer for precise landings.
+Commercial and music titles integrate the mark on their right; other titles
+reserve space on their left or above. There are no decorative docking rings.
+The path and reveal reverse with scroll; the pointer and idle motion remain live.
+The pinned hero and film archive are accounted for when measuring headings.
+ResizeObserver and ScrollTrigger refresh events remeasure after layout changes.
+
+The self-hosted Three.js scene uses beveled geometry, studio strip reflections,
+soft lighting changes on arrival and dedicated finishes for both themes. It
+renders at up to 60 fps with a larger buffer for the portrait reveal and a small
+buffer during travel. Rendering pauses in hidden tabs and behind dialogs; the
+footer stops rendering after it settles. Desktop heading marks are 96–128px;
+phones use 72px and omit pointer attraction. The module loads only when motion
+is enabled. An unavailable or lost GPU shows the original vector and a simpler
+photo dissolve. Reduced motion retains the photograph and static endpoint logos
+without pinning the hero or loading the 3D module.
+
+Clicking the assembled emblem plays a 1.8-second full 3D turn with a small lift
+and moving reflection. Enter and Space use the native button with its visible
+focus outline. Repeated presses during a turn are ignored. The button becomes
+interactive only after assembly; its surrounding overlay passes clicks through.
+Without WebGL, clicking the vector gives a short rocking response.
+Source, pinned build instructions and verification are in `scripts/LOGO-3D.md`.
+The footer repeats the name and role beneath the emblem. Its docking socket
+is excluded from entrance transforms so the final alignment stays stable.
 
 ## Deployment
 

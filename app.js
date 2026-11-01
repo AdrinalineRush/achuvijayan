@@ -11,8 +11,8 @@
   const pad = n => String(n).padStart(2, '0');
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const imgReady = img => !img || img.complete ? Promise.resolve() : new Promise(r => {
-    img.addEventListener('load', r, {toggleActions: 'play none none none'});
-    img.addEventListener('error', r, {toggleActions: 'play none none none'});
+    img.addEventListener('load', r, {once: true});
+    img.addEventListener('error', r, {once: true});
   });
   // 24 fps timecode, HH:MM:SS:FF.
   const timecode = frames => {
@@ -21,6 +21,29 @@
   };
 
   const root = document.documentElement;
+  // Theme is a visitor choice only. Restore before paint in the head, then
+  // update the accessible control here; scrolling never changes this setting.
+  const themeToggle = $('.theme-toggle');
+  function applyTheme(theme) {
+    const isDay = theme === 'light';
+    root.dataset.theme = isDay ? 'light' : 'dark';
+    $('meta[name="theme-color"]').content = isDay ? '#e9e5dc' : '#0b0b0a';
+    if (themeToggle) {
+      const label = isDay ? 'Switch to night theme' : 'Switch to day theme';
+      themeToggle.setAttribute('aria-label', label);
+      themeToggle.title = label;
+      $('.theme-toggle-label', themeToggle).textContent = isDay ? 'Night' : 'Day';
+    }
+  }
+  applyTheme(root.dataset.theme);
+  if (themeToggle) {
+    themeToggle.hidden = false;
+    themeToggle.addEventListener('click', () => {
+      const theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+      applyTheme(theme);
+      try { localStorage.setItem('achu-theme', theme); } catch {}
+    });
+  }
   const films = typeof FEATURE_FILMS !== 'undefined' ? FEATURE_FILMS : [];
   const findFilm = id => films.find(f => f.id === id);
 
@@ -32,6 +55,73 @@
   const motion = !reducedMotion && ['gsap', 'ScrollTrigger', 'SplitText', 'Lenis'].every(n => typeof window[n] !== 'undefined');
   const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
   const narrow = matchMedia('(max-width: 760px)');
+  // Shared timing keeps text, surfaces and overlays moving with the same weight.
+  const MOTION = {ease: 'power3.out', reveal: .9, overlay: .55, stagger: .065};
+  // Re-entering from either direction replays the entrance. Complete offscreen
+  // instead of hiding at a mid-viewport threshold, so small scroll reversals
+  // cannot blink content or restart a counter that is still being read.
+  const replayOnScroll = trigger => ({
+    trigger, start: 'top bottom', end: 'bottom top',
+    toggleActions: 'restart complete restart complete'
+  });
+  // A reversible portrait reveal followed by free-flight intervals between
+  // measured title landings. Pointer attraction is layered on in the ticker.
+  function logoFlightPose(scroll, limit, g, velocity = 0) {
+    const clamp = v => Math.max(0, Math.min(1, v));
+    const smooth = v => { const t = clamp(v); return t * t * (3 - 2 * t); };
+    const mix = (a, b, t) => a + (b - a) * t;
+    const s = Math.max(0, Math.min(scroll, limit));
+    const point = (node, at) => ({x: node.x, y: node.fixed ? node.y : node.y - at + Math.max(0, Math.min(at - (node.pinStart || 0), (node.pinEnd || 0) - (node.pinStart || 0)))});
+    const momentum = Math.max(-16, Math.min(16, velocity * .5));
+    const base = {rotationX: 0, rotationY: 0, rotationZ: 0, energy: Math.min(1, Math.abs(velocity) / 35),
+      phase: 'chapter', reveal: 1, active: -1, attraction: 0, freedom: .15, opacity: 1, photoOpacity: 0, docked: false};
+    const launchEnd = g.heroEnd || g.height * 1.35;
+    const heroScale = g.sourceSize / g.size;
+    if (s <= launchEnd) {
+      const p = clamp(s / launchEnd);
+      const reveal = smooth((p - .06) / .72);
+      const beauty = smooth((p - .58) / .3);
+      return {...base, phase: 'reveal', reveal, x: g.sourceX, y: g.sourceY,
+        scale: heroScale * (1 + beauty * .08), opacity: smooth(p / .06),
+        photoOpacity: 1 - smooth(p / .08), freedom: beauty * .4,
+        rotationX: Math.sin(beauty * Math.PI) * -10,
+        rotationY: Math.sin(beauty * Math.PI) * -34,
+        rotationZ: Math.sin(beauty * Math.PI) * -3, attraction: 0};
+    }
+    if (s >= limit) return {...base, phase: 'footer', x: g.dockX, y: g.dockY - s, scale: g.dockSize / g.size, freedom: 0, docked: true};
+    const nodes = g.nodes.map((node, index) => ({...node, index, stopScale: 1,
+      enter: Math.max(launchEnd + 1, node.y - g.height * .64),
+      leave: node.y + Math.max(0, (node.pinEnd || 0) - (node.pinStart || 0)) - g.height * .29
+    })).filter(node => node.enter < limit - 1);
+    nodes.push({x: g.dockX, y: g.dockY, enter: limit, leave: limit, index: -1, stopScale: g.dockSize / g.size});
+    nodes.forEach((node, index) => { node.leave = Math.max(node.enter, Math.min(node.leave, (nodes[index + 1]?.enter ?? limit) - g.height * .12)); });
+    let previous = {x: g.sourceX, y: g.sourceY, fixed: true, leave: launchEnd, index: -1, stopScale: heroScale * 1.08};
+    for (const node of nodes) {
+      if (s >= node.enter && s <= node.leave) {
+        return {...base, ...point(node, s), scale: node.stopScale, active: node.index};
+      }
+      if (s < node.enter) {
+        const t = clamp((s - previous.leave) / Math.max(1, node.enter - previous.leave));
+        const a = point(previous, previous.leave), b = point(node, node.enter);
+        // Irrational phase spacing gives every journey its own screen-space
+        // composition. Smooth endpoint envelopes make docking and reversal exact.
+        const angle = (node.index + 2) * 2.399963;
+        const roamX = g.width * (.5 + Math.sin(angle) * .32);
+        const roamY = g.height * (.47 + Math.cos(angle * 1.37) * .17);
+        const u = smooth(t), envelope = Math.sin(t * Math.PI) ** 2;
+        const x = mix(a.x, b.x, u) + (roamX - mix(a.x, b.x, .5)) * envelope;
+        const y = mix(a.y, b.y, t) + (roamY - mix(a.y, b.y, .5)) * envelope;
+        return {...base, phase: 'transit', x, y,
+          scale: mix(previous.stopScale, node.stopScale, u) * (1 - envelope * .16),
+          attraction: envelope, freedom: .15 + envelope * .85,
+          rotationX: Math.sin(t * Math.PI * 2) * 12 + momentum * -.25 * envelope,
+          rotationY: Math.sin(angle) * envelope * 30 + momentum * .65 * envelope,
+          rotationZ: Math.cos(angle) * envelope * 9 + momentum * .2 * envelope};
+      }
+      previous = node;
+    }
+    return {...base, x: g.dockX, y: g.dockY - s, scale: 1};
+  }
   let lenis = null;
   const motionToggle = $('.motion-toggle');
   if (motionToggle) {
@@ -132,7 +222,7 @@
     title.textContent = f.title;
     meta.textContent = [f.roles.join(' · '), f.language].filter(Boolean).join(' — ');
     desc.textContent = f.description || '';
-    if (motion) gsap.fromTo([title, meta, desc], {yPercent: 35, autoAlpha: 0}, {yPercent: 0, autoAlpha: 1, duration: .45, ease: 'power3.out', stagger: .04, overwrite: true});
+    if (motion) gsap.fromTo([title, meta, desc], {y: 6, autoAlpha: .65}, {y: 0, autoAlpha: 1, duration: .32, ease: MOTION.ease, stagger: .025, overwrite: true});
   }
 
   // Pad the track so the first and last posters can sit under the centred playhead.
@@ -196,7 +286,7 @@
     $('.archive-preview-description', preview).textContent = f.description || '';
     rows.forEach(r => r.setAttribute('aria-pressed', String(r.dataset.film === id)));
     if (animate && motion) {
-      gsap.fromTo(media, {clipPath: 'inset(0% 0% 100% 0%)', scale: 1.08}, {clipPath: 'inset(0% 0% 0% 0%)', scale: 1, duration: .9, ease: 'expo.out', overwrite: true});
+      gsap.fromTo(media, {autoAlpha: 0, scale: 1.025}, {autoAlpha: 1, scale: 1, duration: MOTION.overlay, ease: MOTION.ease, overwrite: true});
       gsap.fromTo($$('.archive-preview-copy > *', preview), {y: 14, autoAlpha: 0}, {y: 0, autoAlpha: 1, duration: .6, ease: 'power3.out', stagger: .04, overwrite: true});
     }
   }
@@ -434,14 +524,30 @@
     if (f.youtube) vboxFrame.src = `https://www.youtube-nocookie.com/embed/${f.youtube}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     else Object.assign(vboxVideo, {src: f.full, poster: f.poster});
     vbox.showModal();
+    vbox.classList.remove('is-closing');
     lock(true);
     hideCursor();
+    if (motion) gsap.fromTo([f.youtube ? vboxFrame : vboxVideo, $('.vbox-close', vbox)], {autoAlpha: 0, y: 16, scale: .985}, {autoAlpha: 1, y: 0, scale: 1, duration: MOTION.overlay, ease: MOTION.ease, overwrite: true});
     if (!f.youtube) vboxVideo.play().catch(() => {});
   }
+  function closeFilm() {
+    if (!vbox?.open || vbox.classList.contains('is-closing')) return;
+    if (!motion) return vbox.close();
+    vbox.classList.add('is-closing');
+    vboxVideo.pause();
+    gsap.to([vboxVideo, vboxFrame, $('.vbox-close', vbox)], {autoAlpha: 0, y: 10, scale: .99, duration: .24, ease: 'power2.in', overwrite: true, onComplete: () => vbox.close()});
+  }
   if (vbox) {
-    $('.vbox-close', vbox).addEventListener('click', () => vbox.close());
-    vbox.addEventListener('click', e => { if (e.target === vbox) vbox.close(); });
+    $('.vbox-close', vbox).addEventListener('click', closeFilm);
+    vbox.addEventListener('cancel', e => { e.preventDefault(); closeFilm(); });
+    vbox.addEventListener('click', e => { if (e.target === vbox) closeFilm(); });
     vbox.addEventListener('close', () => {
+      vbox.classList.remove('is-closing');
+      if (motion) {
+        const targets = [vboxVideo, vboxFrame, $('.vbox-close', vbox)];
+        gsap.killTweensOf(targets);
+        gsap.set(targets, {clearProps: 'transform,opacity,visibility'});
+      }
       vboxVideo.pause();
       vboxVideo.removeAttribute('src');
       vboxVideo.load();
@@ -479,33 +585,42 @@
     const pic = $('.detail-poster img', detailContent);
     pic?.addEventListener('error', () => {
       pic.parentElement.replaceWith(Object.assign(document.createElement('p'), {className: 'image-unavailable', textContent: 'Poster unavailable.'}));
-    }, {toggleActions: 'play none none none'});
+    }, {once: true});
     dialog.showModal();
+    closing = false;
+    dialog.classList.remove('is-closing');
     lock(true);
     if (motion) {
       hideCursor();
-      gsap.fromTo(panel, {autoAlpha: 0, y: 40}, {autoAlpha: 1, y: 0, duration: .7, ease: 'expo.out'});
+      gsap.fromTo(panel, {autoAlpha: 0, y: 24, scale: .985}, {autoAlpha: 1, y: 0, scale: 1, duration: MOTION.overlay, ease: MOTION.ease, overwrite: true});
       const artEl = $('.detail-poster > *', detailContent);
-      if (artEl) gsap.fromTo(artEl, {clipPath: 'inset(100% 0% 0% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.1, ease: 'expo.inOut', delay: .1});
-      gsap.fromTo($$('.detail-copy > *', detailContent), {y: 24, autoAlpha: 0}, {y: 0, autoAlpha: 1, duration: .8, ease: 'power3.out', stagger: .06, delay: .15});
+      if (artEl) gsap.fromTo(artEl, {autoAlpha: 0, y: 12, scale: .98}, {autoAlpha: 1, y: 0, scale: 1, duration: .7, ease: MOTION.ease, delay: .08});
+      gsap.fromTo($$('.detail-copy > *', detailContent), {y: 14, autoAlpha: 0}, {y: 0, autoAlpha: 1, duration: .6, ease: MOTION.ease, stagger: .045, delay: .12});
     }
   }
   function closeDetail() {
     if (!dialog.open || closing) return;
     if (!motion) return dialog.close();
     closing = true;
-    gsap.to(panel, {autoAlpha: 0, y: 24, duration: .32, ease: 'power2.in', onComplete: () => { closing = false; dialog.close(); }});
+    dialog.classList.add('is-closing');
+    gsap.to(panel, {autoAlpha: 0, y: 12, scale: .99, duration: .24, ease: 'power2.in', overwrite: true, onComplete: () => dialog.close()});
   }
   function lock(on) {
     root.classList.toggle('is-locked', on);
     if (lenis) on ? lenis.stop() : lenis.start();
+    document.dispatchEvent(new Event('portfolio:overlay'));
   }
   $('#close')?.addEventListener('click', closeDetail);
   dialog?.addEventListener('cancel', e => { e.preventDefault(); closeDetail(); });
   dialog?.addEventListener('click', e => { if (e.target === dialog) closeDetail(); });
   dialog?.addEventListener('close', () => {
+    closing = false;
+    dialog.classList.remove('is-closing');
     lock(false);
-    if (motion) gsap.set(panel, {clearProps: 'all'});
+    if (motion) {
+      gsap.killTweensOf([panel, ...$$('*', detailContent)]);
+      gsap.set(panel, {clearProps: 'all'});
+    }
     opener?.focus({preventScroll: true});
   });
 
@@ -561,6 +676,54 @@
 
   let hideCursor = () => {};
 
+  // The scroll layout is immediate; the self-hosted 3D renderer loads lazily.
+  // Keep the vector visible until the first successful GPU frame.
+  let logoSculpture = null;
+  let logoPose = null;
+  function mountSignature() {
+    const mark = $('.signature-mark');
+    if (!mark) return false;
+    mark.addEventListener('click', () => {
+      if (mark.classList.contains('is-playing') || root.classList.contains('is-locked')) return;
+      mark.classList.add('is-playing');
+      if (!logoSculpture?.interact()) {
+        // A small flourish remains available if WebGL cannot render.
+        gsap.timeline().to($('.signature-fallback', mark), {rotation: -12, scale: .94, duration: .25, ease: 'power2.out'})
+          .to($('.signature-fallback', mark), {rotation: 0, scale: 1, duration: 1.1, ease: 'elastic.out(1,.5)'});
+      }
+      gsap.delayedCall(1.8, () => mark.classList.remove('is-playing'));
+    });
+    import('./vendor/logo-sculpture.js?v=20261102-portrait-flight')
+      .then(({createLogoSculpture}) => createLogoSculpture(mark, gsap.ticker))
+      .then(controller => {
+        logoSculpture = controller;
+        if (logoPose) controller.setPose(logoPose);
+        mark.dataset.renderer = 'webgl';
+      })
+      .catch(error => {
+        mark.dataset.renderer = 'fallback';
+        console.warn('3D logo unavailable; using the vector fallback.', error);
+      });
+    return true;
+  }
+  const sculptedSignature = motion && mountSignature();
+  if (sculptedSignature) {
+    // Reserve a real place beside each heading, before SplitText measures it.
+    // The one travelling emblem fills these slots; they are not extra logos.
+    $$('main section').forEach(section => {
+      const title = $('h2, .contact-title', section);
+      if (!title) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'logo-heading' + (title.matches('.contact-title') ? ' logo-heading--contact' : '');
+      const anchor = document.createElement('span');
+      anchor.className = 'logo-anchor';
+      anchor.setAttribute('aria-hidden', 'true');
+      title.before(wrapper);
+      wrapper.append(anchor, title);
+    });
+    root.classList.add('logo-chapters');
+  }
+
   if (motion) initMotion();
   else {
     $('.loader')?.remove();
@@ -581,7 +744,7 @@
     // at a restored deep scroll can retire one-time triggers during pin setup.
     scrollTo({top: 0, left: 0, behavior: 'instant'});
 
-    lenis = new Lenis({lerp: .085, smoothWheel: true});
+    lenis = new Lenis({lerp: .1, smoothWheel: true});
     lenis.on('scroll', ScrollTrigger.update);
     gsap.ticker.add(t => lenis.raf(t * 1000));
     gsap.ticker.lagSmoothing(0);
@@ -596,7 +759,7 @@
       if (target === null) return;
       e.preventDefault();
       history.pushState(null, '', `#${id || 'home'}`);
-      lenis.scrollTo(target, {duration: 1, easing: t => 1 - Math.pow(1 - t, 4), onComplete: () => target && target.focus?.({preventScroll: true})});
+      lenis.scrollTo(target, {duration: 1.15, easing: t => 1 - Math.pow(1 - t, 4), onComplete: () => target && target.focus?.({preventScroll: true})});
     });
     addEventListener('popstate', () => {
       const target = document.getElementById(location.hash.slice(1)) || 0;
@@ -604,31 +767,187 @@
     });
 
     const header = $('.site-header');
-    lenis.on('scroll', ({scroll, direction}) => header.classList.toggle('is-hidden', direction > 0 && scroll > innerHeight * 1.2));
+    let headerScroll = 0;
+    lenis.on('scroll', ({scroll, direction}) => {
+      header.classList.toggle('is-scrolled', scroll > 24);
+      // Ignore tiny inertial reversals and keep an open or focused menu reachable.
+      if (Math.abs(scroll - headerScroll) < 10 && scroll > 24) return;
+      header.classList.toggle('is-hidden', direction > 0 && scroll > innerHeight * 1.2 && !workMenu?.open && !header.contains(document.activeElement));
+      headerScroll = scroll;
+    });
 
     const mm = gsap.matchMedia();
+    const heroHold = sculptedSignature ? ScrollTrigger.create({
+      trigger: '.hero', start: 'top top', end: () => `+=${innerHeight * (narrow.matches ? 1.15 : 1.4)}`,
+      pin: true, pinSpacing: true, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 10
+    }) : null;
 
-    /* --- Opening: the name rises, the portrait card is revealed and settles into its tilt --- */
+    /* --- Opening: the name rises and the portrait settles before its scroll reveal. --- */
     const card = $('.hero-card');
     const cardInner = $('.hero-card-inner');
     const heroImg = $('.hero-card img');
     const heroSplit = SplitText.create('.hero-line', {type: 'chars', charsClass: 'split-char', mask: 'chars'});
 
+    let heroEntrance;
     function heroIntro() {
-      return gsap.timeline()
-        .from(heroSplit.chars, {yPercent: 115, duration: 1.5, ease: 'expo.out', stagger: .035}, 0)
-        .fromTo(cardInner, {clipPath: 'inset(100% 0% 0% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.5, ease: 'expo.inOut'}, .15)
-        .from(cardInner, {rotation: -10, y: 70, duration: 2, ease: 'expo.out'}, .15)
-        .from('.frame-ui > *', {autoAlpha: 0, duration: .6, stagger: .06}, 1.1)
-        .from(['.hero-meta > *', '.hero-foot > *'], {autoAlpha: 0, y: 18, duration: 1, ease: 'power3.out', stagger: .06}, .8);
+      // Finish any previous entrance before capturing its natural end values.
+      if (heroEntrance) heroEntrance.progress(1).kill();
+      heroEntrance = gsap.timeline()
+        .from(heroSplit.chars, {yPercent: 105, duration: 1.2, ease: 'power4.out', stagger: .025}, 0)
+        .from(cardInner, {autoAlpha: 0, rotation: -4, y: 32, scale: .96, duration: 1.4, ease: MOTION.ease}, .12)
+        .from('.frame-ui > *', {autoAlpha: 0, duration: .6, stagger: .04}, .65)
+        .from(['.hero-meta > *', '.hero-foot > *'], {autoAlpha: 0, y: 12, duration: .85, ease: MOTION.ease, stagger: .045}, .4);
+      return heroEntrance;
     }
+    ScrollTrigger.create({trigger: '.hero', start: 'top bottom', end: 'bottom top',
+      onLeave: () => heroEntrance?.progress(1), onEnterBack: () => heroIntro()});
 
     // A gentle depth on the way out: the card lifts and straightens a little, the name lags behind.
     // The photo itself is never scaled.
-    gsap.timeline({defaults: {ease: 'none'}, scrollTrigger: {trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true, invalidateOnRefresh: true}})
-      .to('.hero-name', {yPercent: 16}, 0)
-      .to(card, {y: () => -innerHeight * .1, rotation: 3}, 0)
-      .to('.hero-foot', {autoAlpha: 0, y: -16, duration: .35}, 0);
+    if (!sculptedSignature) mm.add('(min-width: 761px) and (pointer: fine)', () => {
+      gsap.timeline({defaults: {ease: 'none'}, scrollTrigger: {trigger: '.hero', start: 'top top', end: 'bottom top', scrub: .6, invalidateOnRefresh: true}})
+        .to('.hero-name', {yPercent: 10}, 0)
+        .to(card, {y: () => -innerHeight * .065, rotation: 2}, 0);
+    });
+
+    /* --- The emblem visits each heading, then signs off at the footer. --- */
+    function initLogoFlight() {
+      if (!sculptedSignature) return;
+      const flight = $('.signature-flight');
+      const visual = $('.signature-visual');
+      const source = $('.hero-card');
+      const dock = $('.logo-dock');
+      if (!dock || !source) return;
+      const anchors = $$('.logo-anchor');
+      mm.add({compact: '(max-width: 760px)', wide: '(min-width: 761px)', fine: '(hover: hover) and (pointer: fine)'}, context => {
+        const compact = context.conditions.compact;
+        let geometry, geometryFrame = 0, activeIndex = -1;
+        let pointer = {x: innerWidth / 2, y: innerHeight / 2, active: false};
+        let attraction = {x: 0, y: 0}, lastTick = 0;
+        const setX = gsap.quickSetter(visual, 'x', 'px');
+        const setY = gsap.quickSetter(visual, 'y', 'px');
+        const setScaleX = gsap.quickSetter(visual, 'scaleX');
+        const setScaleY = gsap.quickSetter(visual, 'scaleY');
+        const setOpacity = gsap.quickSetter(visual, 'opacity');
+        const setFallbackOpacity = gsap.quickSetter($('.signature-fallback'), 'opacity');
+        const setSourceOpacity = gsap.quickSetter(source, 'opacity');
+        const mark = $('.signature-mark');
+        gsap.set(visual, {xPercent: -50, yPercent: -50, opacity: 1, force3D: false});
+        logoSculpture?.setVisible(true);
+        const render = (time = gsap.ticker.time) => {
+          if (!geometry || document.hidden || root.classList.contains('is-locked')) return;
+          const dt = Math.min(.05, Math.max(.001, time - lastTick));
+          lastTick = time;
+          const pose = logoFlightPose(lenis.scroll, lenis.limit, geometry, lenis.velocity || 0);
+          // Attraction never exceeds a small fraction of the distance to the
+          // pointer. It fades to exactly zero at every deliberate landing.
+          const weight = compact ? 0 : pose.attraction;
+          const tx = pointer.active ? gsap.utils.clamp(-100, 100, (pointer.x - pose.x) * .19) : 0;
+          const ty = pointer.active ? gsap.utils.clamp(-72, 72, (pointer.y - pose.y) * .16) : 0;
+          const damping = 1 - Math.exp(-dt * 4.5);
+          attraction.x += (tx - attraction.x) * damping;
+          attraction.y += (ty - attraction.y) * damping;
+          const driftX = Math.sin(time * .63 + lenis.scroll * .0007) * 12;
+          const driftY = Math.cos(time * .51 + lenis.scroll * .0004) * 9;
+          const radius = geometry.size * pose.scale * .52;
+          const x = gsap.utils.clamp(radius + 8, geometry.width - radius - 8, pose.x + (attraction.x + driftX) * weight);
+          const y = pose.y + (attraction.y + driftY) * weight;
+          setX(x); setY(y); setScaleX(pose.scale); setScaleY(pose.scale); setOpacity(pose.opacity);
+          visual.dataset.phase = pose.phase;
+          visual.style.setProperty('--flight-energy', (pose.phase === 'chapter' ? .1 : pose.energy).toFixed(3));
+          const interactive = pose.opacity > .9 && pose.reveal > .9;
+          mark.tabIndex = interactive ? 0 : -1;
+          mark.style.pointerEvents = interactive ? 'auto' : 'none';
+          if (mark.getAttribute('aria-hidden') !== String(!interactive)) mark.setAttribute('aria-hidden', String(!interactive));
+          logoPose = pose;
+          logoSculpture?.setPose(logoPose);
+          // With no GPU the photograph dissolves into the original vector.
+          const gpuReady = logoSculpture?.ready;
+          setSourceOpacity(gpuReady ? pose.photoOpacity : (pose.phase === 'reveal' ? 1 - pose.reveal : 0));
+          setFallbackOpacity(gpuReady || pose.phase !== 'reveal' ? 1 : pose.reveal);
+          if (activeIndex !== pose.active) {
+            activeIndex = pose.active;
+            anchors.forEach((anchor, index) => anchor.parentElement.classList.toggle('is-logo-active', index === activeIndex));
+          }
+        };
+        const measure = () => {
+          geometryFrame = 0;
+          const sourceRect = source.getBoundingClientRect();
+          const dockRect = dock.getBoundingClientRect();
+          const pins = ScrollTrigger.getAll().filter(trigger => trigger.vars.pin);
+          const heroShift = heroHold ? Math.max(0, Math.min(scrollY - heroHold.start, heroHold.end - heroHold.start)) : 0;
+          geometry = {
+            compact, width: root.clientWidth, height: innerHeight, size: visual.offsetWidth,
+            heroEnd: heroHold?.end || innerHeight * 1.4,
+            sourceX: sourceRect.left + sourceRect.width / 2,
+            sourceY: sourceRect.top + scrollY - heroShift + sourceRect.height / 2,
+            sourceSize: sourceRect.width,
+            dockX: dockRect.left + dockRect.width / 2,
+            dockY: dockRect.top + scrollY + dockRect.height / 2,
+            dockSize: dockRect.width,
+            nodes: anchors.map(anchor => {
+              const rect = anchor.getBoundingClientRect();
+              const pin = pins.find(trigger => trigger.trigger.contains(anchor));
+              const shift = pin ? Math.max(0, Math.min(scrollY - pin.start, pin.end - pin.start)) : 0;
+              return {x: rect.left + rect.width / 2, y: rect.top + scrollY + rect.height / 2 - shift,
+                pinStart: pin?.start || 0, pinEnd: pin?.end || 0};
+            })
+          };
+          lenis.resize();
+          render();
+        };
+        const scheduleMeasure = () => {
+          if (!geometryFrame) geometryFrame = requestAnimationFrame(measure);
+        };
+        const repaint = () => render(gsap.ticker.time);
+        gsap.ticker.add(render);
+        ScrollTrigger.addEventListener('refresh', scheduleMeasure);
+        addEventListener('resize', scheduleMeasure, {passive: true});
+        document.addEventListener('visibilitychange', repaint);
+        document.addEventListener('portfolio:overlay', repaint);
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure);
+        observer?.observe(document.body);
+        observer?.observe($('main'));
+        observer?.observe(dock);
+        anchors.forEach(anchor => observer?.observe(anchor.parentElement));
+        measure();
+        root.classList.add('logo-flight-active');
+        flight.classList.add('is-ready');
+        let removePointer = () => {};
+        if (context.conditions.fine && !compact) {
+          const follow = event => {
+            pointer = {x: event.clientX, y: event.clientY, active: true};
+            logoSculpture?.setPointer(event.clientX / innerWidth - .5, event.clientY / innerHeight - .5);
+          };
+          const settle = () => { pointer.active = false; logoSculpture?.setPointer(0, 0); };
+          addEventListener('pointermove', follow, {passive: true});
+          addEventListener('blur', settle);
+          root.addEventListener('pointerleave', settle);
+          removePointer = () => {
+            removeEventListener('pointermove', follow);
+            removeEventListener('blur', settle);
+            root.removeEventListener('pointerleave', settle);
+            settle();
+          };
+        }
+        return () => {
+          removePointer();
+          observer?.disconnect();
+          logoSculpture?.setVisible(false);
+          if (geometryFrame) cancelAnimationFrame(geometryFrame);
+          gsap.ticker.remove(render);
+          ScrollTrigger.removeEventListener('refresh', scheduleMeasure);
+          removeEventListener('resize', scheduleMeasure);
+          document.removeEventListener('visibilitychange', repaint);
+          document.removeEventListener('portfolio:overlay', repaint);
+          anchors.forEach(anchor => anchor.parentElement.classList.remove('is-logo-active'));
+          gsap.set(visual, {clearProps: 'transform,opacity'});
+          gsap.set(source, {clearProps: 'opacity'});
+          root.classList.remove('logo-flight-active');
+          flight.classList.remove('is-ready');
+        };
+      });
+    }
 
     /* --- Film archive reel: vertical scroll drives the timeline under a fixed playhead --- */
     const reelPin = $('.reel-pin');
@@ -650,8 +969,8 @@
       measure();
       const pick = () => setActive(nearestClip(-gsap.getProperty(track, 'x') + viewport.clientWidth / 2));
       const tween = gsap.to(track, {
-        x: () => -dist, ease: 'none',
-        scrollTrigger: {trigger: reelPin, start: () => reelPin.offsetHeight < innerHeight ? 'center center' : 'top top', end: () => `+=${Math.min(dist * .6, innerHeight * 3)}`, pin: true, scrub: .35, invalidateOnRefresh: true, onRefreshInit: measure, onUpdate: pick, onRefresh: pick}
+        x: () => -dist, ease: 'none', onUpdate: pick,
+        scrollTrigger: {trigger: reelPin, start: () => reelPin.offsetHeight < innerHeight ? 'center center' : 'top top', end: () => `+=${Math.min(dist * .6, innerHeight * 3)}`, pin: true, scrub: .5, anticipatePin: 1, invalidateOnRefresh: true, onRefreshInit: measure, onRefresh: pick}
       });
       seekReel = i => {
         if (!reelClips[i] || !dist) return;
@@ -682,71 +1001,86 @@
 
     /* --- Section furniture --- */
     $$('.selected-card').forEach((card, i) => {
-      gsap.from(card, {y: 48, autoAlpha: 0, duration: 1, delay: i * .08, ease: 'power3.out', scrollTrigger: {trigger: '.selected-grid', start: 'top 85%', toggleActions: 'play none none none'}});
+      gsap.from(card, {y: narrow.matches ? 20 : 32, autoAlpha: 0, duration: MOTION.reveal, delay: narrow.matches ? 0 : i * MOTION.stagger, ease: MOTION.ease, scrollTrigger: replayOnScroll(card)});
     });
-    $$('.rule').forEach(r => gsap.fromTo(r, {scaleX: 0}, {scaleX: 1, duration: 1.6, ease: 'expo.inOut', scrollTrigger: {trigger: r.parentElement, start: 'top 90%', toggleActions: 'play none none none'}}));
-    $$('.section-top').forEach(t => gsap.from($$(':scope > span', t), {y: 14, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: t, start: 'top 90%', toggleActions: 'play none none none'}}));
+    $$('.rule').forEach(r => gsap.fromTo(r, {scaleX: 0}, {scaleX: 1, duration: 1.15, ease: MOTION.ease, scrollTrigger: replayOnScroll(r.parentElement)}));
+    $$('.section-top').forEach(t => gsap.from($$(':scope > span', t), {y: 14, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .08, scrollTrigger: replayOnScroll(t)}));
     $$('[data-split]').forEach(el => {
       // Phones keep the reveal without creating masks around every text line.
       if (narrow.matches) {
-        gsap.from(el, {y:16, autoAlpha:0, duration:.7, ease:'power3.out', scrollTrigger:{trigger:el, start:'top 90%', toggleActions: 'play none none none'}});
+        gsap.from(el, {y:16, autoAlpha:0, duration:.7, ease:'power3.out', scrollTrigger:replayOnScroll(el)});
         return;
       }
       SplitText.create(el, {
       type: 'lines', linesClass: 'split-line', mask: 'lines', autoSplit: true,
-      onSplit: self => gsap.from(self.lines, {yPercent: 115, duration: 1.3, ease: 'expo.out', stagger: .09, scrollTrigger: {trigger: el, start: 'top 86%', toggleActions: 'play none none none'}})
+      onSplit: self => gsap.from(self.lines, {yPercent: 105, duration: 1.05, ease: 'power4.out', stagger: .075, scrollTrigger: replayOnScroll(el)})
       });
     });
-    $$('[data-fade]').forEach(el => gsap.from(el, {y: 24, autoAlpha: 0, duration: 1.1, ease: 'power3.out', scrollTrigger: {trigger: el, start: 'top 88%', toggleActions: 'play none none none'}}));
+    // The counter owns its own entrance below; sharing its visibility window
+    // avoids counting behind a separate fade that has not yet become visible.
+    $$('[data-fade]:not(.tvc-stat)').forEach(el => gsap.from(el, {y: 18, autoAlpha: 0, duration: MOTION.reveal, ease: MOTION.ease, scrollTrigger: replayOnScroll(el)}));
 
     /* --- Filmography list --- */
     gsap.set(rows, {autoAlpha: 0, y: 24});
-    const revealedRows = new WeakSet();
-    ScrollTrigger.batch(rows, {start: 'top 94%', onEnter: batch => {
-      const fresh = batch.filter(row => !revealedRows.has(row));
-      fresh.forEach(row => revealedRows.add(row));
-      if (fresh.length) gsap.to(fresh, {autoAlpha: 1, y: 0, duration: .8, ease: 'power3.out', stagger: .05, overwrite: true});
-    }});
-    gsap.from('.archive-preview', {autoAlpha: 0, y: 40, duration: 1.2, ease: 'expo.out', scrollTrigger: {trigger: '.archive-browser', start: 'top 80%', toggleActions: 'play none none none'}});
+    const rowInView = row => {
+      const bounds = row.getBoundingClientRect();
+      return !row.hidden && bounds.bottom > 0 && bounds.top < innerHeight;
+    };
+    const revealRows = batch => {
+      const visible = batch.filter(rowInView);
+      if (visible.length) gsap.fromTo(visible, {autoAlpha: 0, y: 18}, {autoAlpha: 1, y: 0, duration: .65, ease: MOTION.ease, stagger: .035, overwrite: true});
+    };
+    const finishRows = batch => {
+      // Batches are delayed; re-check geometry after fast direction changes.
+      const outside = batch.filter(row => !rowInView(row));
+      gsap.killTweensOf(outside);
+      gsap.set(outside, {autoAlpha: 1, y: 0});
+    };
+    ScrollTrigger.batch(rows, {start: 'top bottom', end: 'bottom top', interval: .08,
+      onEnter: revealRows, onEnterBack: revealRows, onLeave: finishRows, onLeaveBack: finishRows});
+    // The preview is sticky on desktop, so its whole browser owns the visit.
+    gsap.from('.archive-preview', {autoAlpha: 0, y: 24, duration: MOTION.reveal, ease: MOTION.ease, scrollTrigger: replayOnScroll('.archive-browser')});
 
-    /* --- About: the page turns to paper --- */
-    ScrollTrigger.create({trigger: '#about', start: 'top 55%', end: 'bottom 45%', onToggle: s => { document.body.dataset.theme = s.isActive ? 'light' : 'dark'; }});
+    /* --- About: motion follows the scroll; the visitor controls the theme. --- */
     gsap.to('.asterisk', {rotate: 360, ease: 'none', scrollTrigger: {trigger: '#about', start: 'top bottom', end: 'bottom top', scrub: true}});
-    gsap.from('.disciplines li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .08, scrollTrigger: {trigger: '.disciplines', start: 'top 88%', toggleActions: 'play none none none'}});
+    $$('.disciplines li').forEach(el => gsap.from(el, {y: 20, autoAlpha: 0, duration: .8, ease: MOTION.ease, scrollTrigger: replayOnScroll(el)}));
 
-    /* --- TV commercials: the count runs up once the brief is in view --- */
+    /* --- TV commercials: 0 → 300 on every viewport visit, in either direction. --- */
     const tvcCount = $('.tvc-count');
     if (tvcCount) {
       const n = {v: 0};
-      gsap.to(n, {v: +tvcCount.dataset.count, duration: 2, ease: 'power3.out', scrollTrigger: {trigger: '.tvc-stat', start: 'top 85%', toggleActions: 'play none none none'},
-        onStart: () => { tvcCount.textContent = '0'; }, onUpdate: () => { tvcCount.textContent = Math.round(n.v); }});
+      gsap.timeline({scrollTrigger: replayOnScroll('.tvc-stat')})
+        .from('.tvc-stat', {y: 18, autoAlpha: 0, duration: .65, ease: MOTION.ease}, 0)
+        .fromTo(n, {v: 0}, {v: +tvcCount.dataset.count, duration: 2, ease: 'power3.out',
+          onUpdate: () => { tvcCount.textContent = Math.round(n.v); }}, 0);
     }
 
-    gsap.from('.tvc-beats li', {y: 20, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .09, scrollTrigger: {trigger: '.tvc-beats', start: 'top 88%', toggleActions: 'play none none none'}});
+    $$('.tvc-beats li').forEach(el => gsap.from(el, {y: 20, autoAlpha: 0, duration: .8, ease: MOTION.ease, scrollTrigger: replayOnScroll(el)}));
 
-    /* --- TV commercials: players wipe in --- */
+    /* --- Media surfaces settle into place; no full-frame wipes over footage. --- */
     $$('.spot').forEach((spot, i) => {
-      gsap.timeline({scrollTrigger: {trigger: spot, start: 'top 85%', toggleActions: 'play none none none'}})
-        .fromTo($('.spot-player', spot), {clipPath: 'inset(0% 0% 100% 0%)'}, {clipPath: 'inset(0% 0% 0% 0%)', duration: 1.3, ease: 'expo.inOut', delay: (i % 2) * .12})
-        .from($$('.spot-info > *', spot), {y: 18, autoAlpha: 0, duration: .8, ease: 'power3.out', stagger: .06}, .5);
+      gsap.timeline({scrollTrigger: replayOnScroll(spot)})
+        .from(spot, {y: narrow.matches ? 20 : 32, autoAlpha: 0, duration: MOTION.reveal, ease: MOTION.ease, delay: narrow.matches ? 0 : (i % 2) * MOTION.stagger})
+        .from($$('.spot-info > *', spot), {y: 10, autoAlpha: 0, duration: .65, ease: MOTION.ease, stagger: .035}, .15);
     });
 
-    gsap.from('.ai-process li', {y: 24, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .12, scrollTrigger: {trigger: '.ai-process', start: 'top 85%', toggleActions: 'play none none none'}});
+    $$('.ai-process li').forEach(el => gsap.from(el, {y: 24, autoAlpha: 0, duration: .9, ease: MOTION.ease, scrollTrigger: replayOnScroll(el)}));
 
-    /* --- AI filmmaking: the screens slide in from opposite sides --- */
+    /* --- Each screen reveals when it arrives, including stacked mobile cards. --- */
     if ($('.screens-stage')) {
-      const st = {trigger: '.screens-stage', start: 'top 78%', toggleActions: 'play none none none'};
-      gsap.from('.screens .phone', {xPercent: -25, rotate: -6, autoAlpha: 0, duration: 1.5, ease: 'expo.out', scrollTrigger: st});
-      gsap.from('.screens .cinema', {xPercent: 18, autoAlpha: 0, duration: 1.5, ease: 'expo.out', stagger: .15, scrollTrigger: st});
-      gsap.from('.screen-info', {y: 20, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .1, delay: .5, scrollTrigger: st});
-      gsap.to('.screens-word', {xPercent: -14, ease: 'none', scrollTrigger: {trigger: '.screens', start: 'top bottom', end: 'bottom top', scrub: true}});
+      $$('.screens-stage > *').forEach(screen => {
+        gsap.from(screen, {y: narrow.matches ? 24 : 40, autoAlpha: 0, duration: 1.1, ease: MOTION.ease, scrollTrigger: replayOnScroll(screen)});
+      });
+      if (!narrow.matches) gsap.to('.screens-word', {xPercent: -8, ease: 'none', scrollTrigger: {trigger: '.screens', start: 'top bottom', end: 'bottom top', scrub: .6}});
     }
 
-    /* --- Contact: the light floods in --- */
-    gsap.fromTo('.contact-fill', {clipPath: 'circle(0% at 50% 100%)'}, {clipPath: 'circle(150% at 50% 100%)', ease: 'none', scrollTrigger: {trigger: '#contact', start: 'top bottom', end: 'top 15%', scrub: true}});
-    gsap.from('.ct-line > span', {yPercent: 115, duration: 1.4, ease: 'expo.out', stagger: .1, scrollTrigger: {trigger: '.contact-title', start: 'top 80%', toggleActions: 'play none none none'}});
-    gsap.from('.contact-orb', {scale: 0, rotate: -90, duration: 1.4, ease: 'expo.out', scrollTrigger: {trigger: '.contact-title', start: 'top 80%', toggleActions: 'play none none none'}});
-    gsap.from(['.contact-bottom > *', '#contact footer > *'], {y: 16, autoAlpha: 0, duration: .9, ease: 'power3.out', stagger: .06, scrollTrigger: {trigger: '.contact-bottom', start: 'top 95%', toggleActions: 'play none none none'}});
+    /* --- Contact: the glass surface catches the light. --- */
+    gsap.from('.contact-fill', {opacity: .25, ease: 'none', scrollTrigger: {trigger: '#contact', start: 'top bottom', end: 'top 25%', scrub: .6}});
+    gsap.from('.ct-line > span', {yPercent: 115, duration: 1.4, ease: 'expo.out', stagger: .1, scrollTrigger: replayOnScroll('.contact-title')});
+    gsap.from('.contact-orb', {scale: .88, autoAlpha: 0, y: 20, duration: 1, ease: MOTION.ease, scrollTrigger: replayOnScroll('.contact-orb')});
+    ['.contact-bottom', '#contact footer'].forEach(selector => gsap.from($$(`${selector} > *:not(.footer-brand)`), {y: 16, autoAlpha: 0, duration: .9, ease: MOTION.ease, stagger: .06, scrollTrigger: replayOnScroll(selector)}));
+    // Keep the docking socket untransformed; only the closing name reveals.
+    gsap.from('.footer-brand-copy', {y: 10, autoAlpha: 0, duration: .8, ease: MOTION.ease, scrollTrigger: replayOnScroll('.footer-brand')});
 
     /* --- Timeline HUD --- */
     const hud = $('.hud');
@@ -777,8 +1111,8 @@
       root.classList.add('has-cursor');
       const cursor = $('.cursor');
       const label = $('.cursor-label');
-      const xTo = gsap.quickTo(cursor, 'x', {duration: .45, ease: 'power3'});
-      const yTo = gsap.quickTo(cursor, 'y', {duration: .45, ease: 'power3'});
+      const xTo = gsap.quickTo(cursor, 'x', {duration: .2, ease: MOTION.ease});
+      const yTo = gsap.quickTo(cursor, 'y', {duration: .2, ease: MOTION.ease});
       let placed = false, current = null;
       addEventListener('pointermove', e => {
         if (!placed) { gsap.set(cursor, {x: e.clientX, y: e.clientY}); placed = true; }
@@ -789,6 +1123,8 @@
         current = null;
         gsap.to(cursor, {scale: 0, autoAlpha: 0, duration: .3, ease: 'power3.out', overwrite: 'auto'});
       };
+      document.documentElement.addEventListener('pointerleave', hideCursor);
+      addEventListener('blur', hideCursor);
       document.addEventListener('pointerover', e => {
         const t = e.target.closest('[data-cursor]');
         if (t === current) return;
@@ -797,19 +1133,31 @@
         label.textContent = t.dataset.cursor;
         gsap.to(cursor, {scale: 1, autoAlpha: 1, duration: .5, ease: 'expo.out', overwrite: 'auto'});
       });
-      $$('[data-magnetic]').forEach(el => {
-        const mx = gsap.quickTo(el, 'x', {duration: .9, ease: 'elastic.out(1, .35)'});
-        const my = gsap.quickTo(el, 'y', {duration: .9, ease: 'elastic.out(1, .35)'});
-        el.addEventListener('pointermove', e => {
-          const r = el.getBoundingClientRect();
-          mx((e.clientX - r.left - r.width / 2) * .35);
-          my((e.clientY - r.top - r.height / 2) * .35);
+      // Move the arrow inside its stable hit area, so the button never escapes the pointer.
+      $$('.contact-orb, .scroll-cue').forEach(button => {
+        const el = $('span', button);
+        if (!el) return;
+        const mx = gsap.quickTo(el, 'x', {duration: .5, ease: MOTION.ease});
+        const my = gsap.quickTo(el, 'y', {duration: .5, ease: MOTION.ease});
+        button.addEventListener('pointermove', e => {
+          const r = button.getBoundingClientRect();
+          mx((e.clientX - r.left - r.width / 2) * .16);
+          my((e.clientY - r.top - r.height / 2) * .16);
         });
-        el.addEventListener('pointerleave', () => { mx(0); my(0); });
+        button.addEventListener('pointerleave', () => { mx(0); my(0); });
       });
+      const light = $('.hero-atmosphere i');
+      const lightX = gsap.quickTo(light, 'x', {duration: 1.8, ease: MOTION.ease});
+      const lightY = gsap.quickTo(light, 'y', {duration: 1.8, ease: MOTION.ease});
+      $('.hero').addEventListener('pointermove', e => {
+        lightX((e.clientX / innerWidth - .5) * 40);
+        lightY((e.clientY / innerHeight - .5) * 30);
+      }, {passive: true});
+      $('.hero').addEventListener('pointerleave', () => { lightX(0); lightY(0); });
     }
 
     /* --- Ordering, late layout, and the opening --- */
+    initLogoFlight();
     ScrollTrigger.sort();
     document.fonts?.ready.then(() => ScrollTrigger.refresh());
     addEventListener('load', () => {
@@ -833,11 +1181,9 @@
         lenis.resize();
         lenis.scrollTo(hashTarget, {immediate: true, force: true});
         ScrollTrigger.update();
-        // A direct section link should show its content immediately, including
-        // on reload when the browser restores a position past reveal triggers.
-        ScrollTrigger.getAll().forEach(trigger => {
-          if (trigger.vars.toggleActions === 'play none none none' && hashTarget.contains(trigger.trigger)) trigger.animation?.progress(1);
-        });
+        // Replay triggers finish skipped content and animate visible entries.
+        // Do not force an entire section to its end state: that skips counters
+        // and pre-completes cards that are still below the viewport.
       });
       return;
     }

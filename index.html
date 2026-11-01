@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="no-js">
+<html lang="en" class="no-js" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -23,21 +23,27 @@
 <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
 <link rel="alternate icon" type="image/png" href="assets/icons/favicon.png">
 <link rel="apple-touch-icon" href="assets/icons/favicon.png">
-<script>document.documentElement.className='js';</script>
+<link rel="preload" as="image" href="assets/icons/logo-metal.svg">
+<script>
+document.documentElement.className='js';
+try{if(localStorage.getItem('achu-theme')==='light')document.documentElement.dataset.theme='light';}catch{}
+document.querySelector('meta[name="theme-color"]').content=document.documentElement.dataset.theme==='light'?'#e9e5dc':'#0b0b0a';
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261031-manikya">
+<link rel="stylesheet" href="style.css?v=20261102-heading-fit">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Person","name":"Achu Vijayan","url":"https://www.achuvijayan.com/","image":"https://www.achuvijayan.com/assets/images/achu-vijayan.jpg","jobTitle":"Filmmaker and Editor","sameAs":["https://www.imdb.com/name/nm6800145/","https://www.instagram.com/achuvijayan/"]}</script>
 </head>
-<body data-theme="dark">
+<body>
 <a class="skip" href="#selected">Skip to work</a>
 
 <div class="loader" aria-hidden="true">
   <div class="loader-panel loader-panel--top"></div>
   <div class="loader-panel loader-panel--bottom"></div>
   <div class="loader-inner">
-    <img class="loader-mark" src="assets/icons/logo.svg" alt="" width="56" height="56">
+    <img class="loader-mark" src="assets/icons/logo-metal.svg" alt="" width="128" height="128">
+    <span class="loader-name">ACHU VIJAYAN</span>
     <span class="loader-tc">00:00:00:00</span>
     <span class="loader-line"><i></i></span>
     <span class="loader-label mono">Achu Vijayan — Portfolio / 2026</span>
@@ -45,13 +51,20 @@
 </div>
 
 <header class="site-header">
-  <a class="wordmark" href="#home" aria-label="Achu Vijayan, back to top"><img src="assets/icons/logo.svg" alt="" width="34" height="34"><span>ACHU VIJAYAN</span></a>
+  <a class="wordmark" href="#home" aria-label="Achu Vijayan, back to top"><span class="wordmark-emblem" aria-hidden="true"><img src="assets/icons/logo.svg" alt="" width="34" height="34"></span><span>ACHU VIJAYAN</span></a>
   <nav class="nav" aria-label="Main navigation">
     <details class="work-menu"><summary>Work <span aria-hidden="true">⌄</span></summary><div class="work-menu-panel"><a href="#selected">Selected films</a><a href="#archive">Film timeline</a><a href="#filmography">Full filmography</a><a href="#commercials">Commercials</a><a href="#experiments">AI films</a><a href="#music">Music videos &amp; singles</a><a href="#trailers">Trailer cuts</a></div></details>
     <a href="#about"><span class="roll" data-text="About"><span>About</span></span></a>
     <a href="#contact" class="nav-cta"><span class="roll" data-text="Let’s talk ↗"><span>Let’s talk ↗</span></span></a>
   </nav>
-  <span class="location mono">Kerala, India <i></i></span>
+  <div class="header-tools">
+    <span class="location mono">Kerala, India <i></i></span>
+    <button class="theme-toggle" type="button" aria-label="Switch to day theme" title="Switch to day theme" hidden>
+      <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+      <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/></svg>
+      <span class="theme-toggle-label">Day</span>
+    </button>
+  </div>
 </header>
 
 <div class="hud" aria-hidden="true">
@@ -63,8 +76,18 @@
 <div class="cursor" aria-hidden="true"><span class="cursor-label">View</span></div>
 <div class="grain" aria-hidden="true"></div>
 
+<div class="signature-flight">
+  <div class="signature-visual">
+    <button class="signature-mark" type="button" aria-label="Spin the Achu Vijayan logo" title="Give the logo a spin">
+      <img class="signature-fallback" src="assets/icons/logo-metal.svg" alt="" width="400" height="400" decoding="async">
+      <span class="signature-hint" aria-hidden="true">Give it a spin</span>
+    </button>
+  </div>
+</div>
+
 <main>
   <section id="home" class="hero" data-reel="Opening">
+    <div class="hero-atmosphere" aria-hidden="true"><i></i><i></i></div>
     <div class="hero-meta mono"><span>Independent filmmaker &amp; editor</span><span>Kerala, India / 2026</span></div>
     <div class="hero-body">
       <h1 class="hero-name"><span class="hero-line">Achu</span> <span class="hero-line">Vijayan<span class="period">.</span></span></h1>
@@ -281,7 +304,7 @@
       </div>
     </div>
     <footer class="mono">
-      <span>© 2026 Achu Vijayan</span>
+      <span class="footer-brand"><span class="logo-dock" aria-hidden="true"><img src="assets/icons/logo-metal.svg" alt="" width="88" height="88"></span><span class="footer-brand-copy"><strong>Achu Vijayan</strong><span>Filmmaker &amp; editor</span><small>© 2026 · Kerala, India</small></span></span>
       <span>Made with intent. Every frame.</span>
       <span id="clock">Kerala, India</span><button class="motion-toggle" type="button" aria-pressed="false" hidden>Reduce motion</button>
       <a href="#home">Back to top ↑</a>
@@ -308,6 +331,6 @@
 <script src="vendor/lenis.min.js"></script>
 <script src="image-sources.js?v=20261026-cleanup"></script>
 <script src="data.js?v=20261031-trailers"></script>
-<script src="app.js?v=20261031-trailers"></script>
+<script src="app.js?v=20261102-portrait-flight"></script>
 </body>
 </html>
