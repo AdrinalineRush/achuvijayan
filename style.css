@@ -109,6 +109,7 @@ section:focus{outline:none}
 .rule{position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);transform-origin:left}
 h2{font-size:clamp(46px,7.2vw,132px);line-height:.94;letter-spacing:-.055em}
 h2 em{letter-spacing:-.025em}
+.title-accent{color:var(--accent)}
 .heading-row{display:flex;justify-content:space-between;align-items:end;gap:40px;margin:clamp(48px,7vw,96px) 0 clamp(56px,8vw,120px)}
 .heading-row>p{max-width:360px;color:var(--muted);font-size:15px;line-height:1.75}
 .pill{display:inline-flex;align-items:center;gap:10px;padding:13px 20px;border:1px solid var(--line);border-radius:999px;font-size:13px;font-weight:500;white-space:nowrap;transition:background .35s,color .35s,border-color .35s}
