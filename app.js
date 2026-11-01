@@ -333,7 +333,7 @@
   if (defaultFilm) showPreview(defaultFilm.id, false);
   applyFilter('all', false);
 
-  /* ---------- Commercials and music videos: shared click-to-play players ---------- */
+  /* ---------- Video cards: muted autoplay previews and full playback with sound ---------- */
   const commercials = typeof TV_COMMERCIALS !== 'undefined' ? TV_COMMERCIALS : [];
   const musicVideos = typeof MUSIC_VIDEOS !== 'undefined' ? MUSIC_VIDEOS : [];
   const trailers = typeof TRAILER_CUTS !== 'undefined' ? TRAILER_CUTS : [];
@@ -357,7 +357,7 @@
     const fallback = !c.poster && v?.fallback ? ` data-fallback="${v.fallback}"` : '';
     const art = poster ? `<img class="spot-poster" src="${esc(poster)}" alt="" loading="lazy" decoding="async"${fallback}>` : '<span class="spot-placeholder" aria-hidden="true"></span>';
     const face = v
-      ? `<button class="spot-play" type="button" data-spot="${i}" data-cursor="Play" aria-label="Play ${esc(title)}">${art}${tag}<span class="spot-btn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></svg></span></button>`
+      ? `<button class="spot-play" type="button" data-spot="${i}" data-cursor="Sound" aria-label="Watch ${esc(title)} with sound">${art}${tag}<span class="spot-btn" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.2v13.6L19 12z" fill="currentColor"/></svg></span></button>`
       : `<div class="spot-play is-empty">${art}${tag}<span class="spot-empty mono">Video link to come</span></div>`;
     return `<article class="spot" data-index="${i}">
       <div class="spot-player">${face}</div>
@@ -384,14 +384,15 @@
     if (img.complete && img.naturalWidth && img.naturalWidth < 200) swap();
   });
 
-  // Embeds load only on play; commercials, music videos and trailers share one active player.
+  // Full playback with sound is exclusive; visible cards otherwise loop silently.
   let playing = null;
   function stopSpot() {
     if (!playing) return;
+    soundWatch?.unobserve(playing.face.parentElement);
     playing.frame.remove();
     playing.face.hidden = false;
     playing = null;
-    inView.forEach(startLoop);
+    syncPreviews();
   }
   function playSpot(i) {
     const c = spots[i], v = parseVideo(c?.video);
@@ -407,7 +408,7 @@
     } else {
       frame = document.createElement('iframe');
       frame.src = v.type === 'youtube'
-        ? `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+        ? `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&start=${Number(c.start) || 0}`
         : `https://player.vimeo.com/video/${v.id}?autoplay=1&title=0&byline=0&portrait=0${v.hash ? `&h=${v.hash}` : ''}`;
       frame.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
       frame.allowFullscreen = true;
@@ -417,6 +418,7 @@
     face.hidden = true;
     face.parentElement.append(frame);
     playing = {frame, face};
+    soundWatch?.observe(face.parentElement);
     hideCursor();
     frame.focus?.();
   }
@@ -425,46 +427,106 @@
     if (play) playSpot(+play.dataset.spot);
   });
 
-  // Music videos loop silently in their cards while on screen (not for reduced motion or Data Saver).
+  // Commercials, music videos and trailers loop silently while on screen.
   // A loop shows only once YouTube reports it playing, so its title overlay stays under the poster,
   // and returns to its loopStart when it ends; the loops stop while a video plays with sound.
-  const loops = new Map(), inView = new Set();
+  const loops = new Map(), inView = new Set(), screensInView = new Set();
+  // Use YouTube's ready/state events rather than a single postMessage sent
+  // before its player is listening. Load the API once, on the first visible card.
+  let youtubeReady;
+  function loadYouTube() {
+    if (window.YT?.Player) return Promise.resolve(window.YT);
+    if (youtubeReady) return youtubeReady;
+    youtubeReady = new Promise((resolve, reject) => {
+      const previous = window.onYouTubeIframeAPIReady;
+      const timeout = setTimeout(() => reject(new Error('YouTube player API timed out')), 20000);
+      window.onYouTubeIframeAPIReady = () => {
+        clearTimeout(timeout);
+        previous?.();
+        resolve(window.YT);
+      };
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.onerror = () => { clearTimeout(timeout); reject(new Error('YouTube player API unavailable')); };
+      document.head.append(script);
+    });
+    return youtubeReady;
+  }
+  const soundWatch = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    entries.forEach(({target, isIntersecting}) => {
+      if (!isIntersecting && playing?.face.parentElement === target) stopSpot();
+    });
+  }) : null;
+  const previewsAllowed = () => !reducedMotion && !navigator.connection?.saveData && !document.hidden && !root.classList.contains('is-locked') && !playing;
+  function syncPreviews() {
+    if (previewsAllowed()) inView.forEach(startLoop);
+    else [...loops.keys()].forEach(endLoop);
+    screensInView.forEach(video => {
+      if (previewsAllowed()) video.play().catch(() => {});
+      else video.pause();
+    });
+  }
+  document.addEventListener('visibilitychange', syncPreviews);
+  document.addEventListener('portfolio:overlay', syncPreviews);
+  // A user gesture also retries previews that the browser initially blocked.
+  document.addEventListener('pointerdown', syncPreviews, {passive: true});
+  document.addEventListener('keydown', syncPreviews);
   function endLoop(card) {
-    loops.get(card)?.remove();
+    const entry = loops.get(card);
     loops.delete(card);
+    if (!entry) return;
+    entry.player?.destroy();
+    entry.frame.remove();
   }
   function startLoop(card) {
     const c = spots[+card.dataset.index], v = parseVideo(c?.video);
-    if (playing || loops.has(card) || v?.type !== 'youtube') return;
+    if (!previewsAllowed() || v?.type !== 'youtube') return;
+    const existing = loops.get(card);
+    if (existing) {
+      if (existing.ready) { existing.player.mute(); existing.player.playVideo(); }
+      return;
+    }
     const frame = Object.assign(document.createElement('iframe'), {className: 'spot-loop', tabIndex: -1, title: ''});
     frame.dataset.start = c.loopStart || 0;
-    frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&mute=1&start=${frame.dataset.start}&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1`;
+    const origin = /^https?:$/.test(location.protocol) ? `&origin=${encodeURIComponent(location.origin)}` : '';
+    frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&mute=1&loop=1&playlist=${v.id}&start=${frame.dataset.start}&controls=0&disablekb=1&fs=0&rel=0&iv_load_policy=3&playsinline=1&enablejsapi=1${origin}`;
     frame.allow = 'autoplay; encrypted-media';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
     frame.setAttribute('aria-hidden', 'true');
-    frame.addEventListener('load', () => frame.contentWindow?.postMessage(JSON.stringify({event: 'listening', id: card.dataset.index, channel: 'widget'}), '*'));
+    const entry = {frame, player: null, ready: false};
+    loops.set(card, entry);
     $('.spot-player', card).append(frame);
-    loops.set(card, frame);
+    loadYouTube().then(YT => {
+      if (loops.get(card) !== entry) return;
+      entry.player = new YT.Player(frame, {events: {
+        onReady: event => {
+          if (loops.get(card) !== entry) return;
+          entry.ready = true;
+          event.target.mute();
+          if (previewsAllowed() && inView.has(card)) event.target.playVideo();
+        },
+        onStateChange: event => {
+          if (loops.get(card) !== entry) return;
+          if (event.data === YT.PlayerState.PLAYING) frame.classList.add('is-live');
+          if (event.data === YT.PlayerState.ENDED && previewsAllowed() && inView.has(card)) {
+            event.target.seekTo(Number(frame.dataset.start), true);
+            event.target.playVideo();
+          }
+        },
+        onError: () => { frame.classList.remove('is-live'); }
+      }});
+    }).catch(() => {
+      // A blocked provider retains the clickable poster instead of a blank card.
+      if (loops.get(card) === entry) endLoop(card);
+    });
   }
-  addEventListener('message', e => {
-    if (!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)) return;
-    const frame = [...loops.values()].find(f => f.contentWindow === e.source);
-    let d;
-    try { d = JSON.parse(e.data); } catch { return; }
-    const state = d.event === 'onStateChange' ? d.info : d.info?.playerState;
-    if (!frame || state == null) return;
-    if (state === 1) frame.classList.add('is-live');
-    if (state === 0) {
-      const send = (func, args = []) => frame.contentWindow?.postMessage(JSON.stringify({event: 'command', func, args}), '*');
-      send('seekTo', [+frame.dataset.start, true]);
-      send('playVideo');
-    }
-  });
-  if (musicGrid && !reducedMotion && !navigator.connection?.saveData && 'IntersectionObserver' in window) {
+  if (!reducedMotion && !navigator.connection?.saveData && 'IntersectionObserver' in window) {
     const loopWatch = new IntersectionObserver(entries => entries.forEach(({target, isIntersecting}) => {
-      if (isIntersecting) { inView.add(target); startLoop(target); }
-      else { inView.delete(target); endLoop(target); }
-    }), {rootMargin: '10% 0px'});
-    $$('.spot', musicGrid).forEach(card => loopWatch.observe(card));
+      const card = target.closest('.spot');
+      if (isIntersecting) { inView.add(card); startLoop(card); }
+      else { inView.delete(card); endLoop(card); }
+    }), {threshold: .05});
+    $$('.spot-player').forEach(player => loopWatch.observe(player));
   }
 
   /* ---------- AI filmmaking: films on a phone and on cinema screens ---------- */
@@ -500,9 +562,10 @@
       new IntersectionObserver(([e]) => {
         if (e.isIntersecting) {
           if (!v.src) v.src = v.dataset.src;
-          if (!playing && !$('#vbox')?.open) v.play().catch(() => {});
-        } else v.pause();
-      }, {rootMargin: '15% 0px'}).observe(v);
+          screensInView.add(v);
+          if (previewsAllowed()) v.play().catch(() => {});
+        } else { screensInView.delete(v); v.pause(); }
+      }, {threshold: .05}).observe(v);
     });
   }
 

@@ -274,8 +274,9 @@ h2 em{letter-spacing:-.025em}
 .spot-play:hover .spot-btn,.spot-play:focus-visible .spot-btn,.screen:hover .screen-play,.screen:focus-visible .screen-play{transform:scale(1.08);background:#ece8df;border-color:#ece8df;color:#0b0b0a}
 .spot-empty{position:absolute;z-index:2;left:50%;top:50%;translate:-50% -50%;color:#8f8c84;white-space:nowrap}
 .spot-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
-/* Silent music-video loops: scaled so 2.39:1 letterboxed videos fill the 16:9 card. */
-.spot-loop{position:absolute;z-index:1;inset:0;width:100%;height:100%;border:0;pointer-events:none;opacity:0;scale:1.35;filter:saturate(.85) brightness(.78);transition:opacity 1s var(--ease),filter .6s var(--ease)}
+/* Muted card previews retain their framing; music loops fill letterboxed footage. */
+.spot-loop{position:absolute;z-index:1;inset:0;width:100%;height:100%;border:0;pointer-events:none;opacity:0;scale:1;filter:saturate(.85) brightness(.78);transition:opacity 1s var(--ease),filter .6s var(--ease)}
+.music .spot-loop{scale:1.35}
 .spot-loop.is-live{opacity:1}
 .spot-play:hover~.spot-loop{filter:none}
 .spot-info{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:8px 20px;padding-top:18px}

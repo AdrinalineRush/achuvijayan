@@ -351,7 +351,7 @@ const TOOLKIT = [
 const TV_COMMERCIALS = [
   { title: "Dr. Joy's Medstore — Film 1", brand: "Dr. Joy's Medstore", year: "2023", duration: "0:48", role: "Director & Editor", video: "https://youtu.be/CgLIa42pw70", poster: "" },
   { title: "Cathay Pacific — Student Fare", brand: "Cathay Pacific", year: "2026", duration: "1:07", role: "VFX & Editor", video: "https://youtu.be/td3I1mamYR4", poster: "" },
-  { title: "Dr. Joy's Medstore — Film 2", brand: "Dr. Joy's Medstore", year: "2023", duration: "0:42", role: "Director & Editor", video: "https://youtu.be/xxp5gB2fTbI", poster: "" },
+  { title: "Dr. Joy's Medstore — Film 2", brand: "Dr. Joy's Medstore", year: "2023", duration: "0:42", role: "Director & Editor", video: "https://youtu.be/xxp5gB2fTbI", start: 18, loopStart: 18, poster: "" },
   { title: "Pappai Ice Cream", brand: "Pappai", year: "2017", duration: "0:30", role: "Editor", video: "https://youtu.be/VFSJlloIPgc", poster: "" }
 ];
 

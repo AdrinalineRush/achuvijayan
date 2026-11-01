@@ -48,8 +48,12 @@ Image dimensions come from the manifest; `POSTER_SIZE` is a fallback. Bump affec
 `?v=` tags in the HTML after changing scripts or styles. Optimized filenames
 already change when the source artwork changes.
 
-Full videos load on play. Silent previews load near the viewport, except when
-reduced motion or a supported data-saving preference is active.
+Full videos with sound load on click. Commercials, music videos, trailer cuts
+and AI films autoplay muted previews while visible. Previews stop outside the
+viewport, in a hidden tab, behind a dialog or during playback with sound, and
+resume when eligible again. Reduced motion and supported Data Saver preferences
+retain click-to-play posters. Browser or provider autoplay restrictions may also
+leave the poster visible.
 
 ## Appearance and motion
 
