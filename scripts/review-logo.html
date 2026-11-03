@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logo lighting and reveal review</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  body{min-height:100svh;display:grid;grid-template-columns:280px 1fr;align-items:center;gap:8vw;padding:5vw;background:var(--bg);color:var(--fg)}
+  aside{display:grid;gap:24px}h1{font:500 30px/1.12 var(--sans);letter-spacing:-.04em}p{font:13px/1.7 var(--mono);color:#969d91}
+  nav{display:grid;gap:8px}nav button{padding:12px 16px;border:1px solid #ffffff20;border-radius:4px;text-align:left;font:12px var(--mono)}
+  nav button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:#beff1f08}
+  .stage{width:min(48vw,540px);aspect-ratio:1;position:relative}.signature-mark{position:absolute;inset:0}.signature-canvas{opacity:1}
+  .stage::before{content:'';position:absolute;inset:-15%;background:radial-gradient(ellipse,#9bb7630b,transparent 65%);pointer-events:none}
+  @media(max-width:700px){body{grid-template-columns:1fr;gap:50px}.stage{width:75vw;margin:auto;grid-row:1}nav{grid-template-columns:1fr 1fr}}
+</style>
+<aside>
+  <h1>From the frame.<br>Into form.</h1>
+  <p>Local review of the production sculpture, photograph and studio lighting.</p>
+  <nav aria-label="Reveal checkpoints">
+    <button data-reveal="0" aria-pressed="true">01 / Photograph</button>
+    <button data-reveal=".16" aria-pressed="false">02 / Contour</button>
+    <button data-reveal=".36" aria-pressed="false">03 / Relief</button>
+    <button data-reveal=".62" aria-pressed="false">04 / Material</button>
+    <button data-reveal="1" data-turn="true" aria-pressed="false">05 / Studio turn</button>
+    <button data-reveal="1" aria-pressed="false">06 / Docked</button>
+  </nav>
+  <button id="theme">Switch theme</button>
+  <button id="play" type="button">Play full reveal</button>
+  <label for="progress">Scrub the sequence</label>
+  <input id="progress" type="range" min="0" max="1000" value="0">
+  <p id="status" role="status">Preparing sculpture…</p>
+</aside>
+<main class="stage"><div class="signature-mark" aria-label="Production logo"></div></main>
+<script type="module">
+  import {createLogoSculpture} from '../vendor/logo-sculpture.js?v=20261103-titanium-reveal';
+  const callbacks=new Set();
+  const ticker={time:0,add:fn=>callbacks.add(fn),remove:fn=>callbacks.delete(fn)};
+  function frame(t){ticker.time=t/1000;callbacks.forEach(fn=>fn(ticker.time));requestAnimationFrame(frame)}
+  requestAnimationFrame(frame);
+  try {
+    const sculpture=await createLogoSculpture(document.querySelector('.signature-mark'),ticker);
+    const pose=(reveal,turn=false)=>({phase:'reveal',reveal,opacity:1,scale:3,active:-1,docked:false,freedom:0,rotationX:turn?-10:0,rotationY:turn?-32:0,rotationZ:turn?-2.5:0});
+    let playing=false, started=0;
+    const progress=document.querySelector('#progress'), play=document.querySelector('#play');
+    const ease=v=>{const t=Math.max(0,Math.min(1,v));return t*t*t*(t*(t*6-15)+10)};
+    const show=p=>{
+      const beauty=Math.sin(ease((p-.37)/.6)*Math.PI)**2;
+      sculpture.setPose({...pose(ease((p-.055)/.61)),rotationX:-13*beauty,rotationY:-24*beauty,rotationZ:-2*beauty,scrollTurn:360*ease((p-.54)/.43)});
+      progress.value=Math.round(p*1000);
+    };
+    const stop=()=>{playing=false;play.textContent='Play full reveal'};
+    play.onclick=()=>{if(playing){stop();return}playing=true;started=ticker.time;play.textContent='Pause reveal'};
+    progress.oninput=()=>{stop();show(Number(progress.value)/1000)};
+    callbacks.add(time=>{if(!playing)return;const p=Math.min(1,(time-started)/10);show(p);if(p===1)stop()});
+    sculpture.setPose(pose(0));
+    document.querySelectorAll('[data-reveal]').forEach(button=>button.addEventListener('click',()=>{
+      stop();
+      document.querySelectorAll('[data-reveal]').forEach(el=>el.setAttribute('aria-pressed',String(el===button)));
+      sculpture.setPose(pose(Number(button.dataset.reveal),!!button.dataset.turn));
+      document.querySelector('#status').textContent=button.textContent;
+    }));
+    document.querySelector('#theme').onclick=()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='light'?'dark':'light';document.body.style.background=document.documentElement.dataset.theme==='light'?'#e9e5dc':'#0b0b0a';};
+    document.querySelector('#status').textContent='Ready / production WebGL renderer';
+  } catch(error){document.querySelector('#status').textContent=error.message;console.error(error)}
+</script>
+</html>

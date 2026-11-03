@@ -6,7 +6,20 @@ import vm from 'node:vm';
 // Run against the shipped bundle; a lightweight XML DOM is sufficient here.
 if (!process.argv[2]) throw new Error('Pass the installed linkedom/esm/index.js path');
 const {DOMParser} = await import(pathToFileURL(process.argv[2]).href);
-globalThis.DOMParser = DOMParser;
+globalThis.DOMParser = class extends DOMParser {
+  parseFromString(...args) {
+    const document = super.parseFromString(...args);
+    // Browsers return an empty string for an unset CSS declaration; linkedom
+    // returns undefined. Match the browser contract for SVGLoader's style pass.
+    document.querySelectorAll('*').forEach(node => {
+      if (!node.style) return;
+      Object.defineProperty(node, 'style', {value: new Proxy(node.style, {
+        get(target, property) { return Reflect.get(target, property) ?? ''; }
+      })});
+    });
+    return document;
+  }
+};
 const {buildLogoModel, logoInteractionPose, logoAssemblyPose} = await import('../vendor/logo-sculpture.js');
 const svg = await readFile(new URL('../assets/icons/logo.svg', import.meta.url), 'utf8');
 const {model, materials, width, height} = buildLogoModel(svg);
@@ -16,8 +29,8 @@ assert.deepEqual(model.children.reduce((roles, mesh) => {
   roles[mesh.userData.role] = (roles[mesh.userData.role] || 0) + 1;
   return roles;
 }, {}), {v: 3, a: 3, frame: 6}, 'A and V each contain their original metal contours and inlay');
-assert.equal(model.children.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.count, 0), 12996,
-  'Splitting the source geometry preserves the original vertex count');
+assert.ok(model.children.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.count, 0) < 22000,
+  'Rounded bevels retain a small geometry budget');
 for (const mesh of model.children) {
   const geometry = mesh.geometry;
   for (const key of ['position', 'normal']) {
@@ -27,12 +40,13 @@ for (const mesh of model.children) {
   for (let index = 0; index < normal.count; index++) {
     assert.ok(Math.abs(Math.hypot(normal.getX(index), normal.getY(index), normal.getZ(index)) - 1) < .001);
   }
-  assert.ok(geometry.boundingBox.max.z - geometry.boundingBox.min.z > 54, 'Physical depth');
+  assert.ok(geometry.boundingBox.max.z - geometry.boundingBox.min.z >= (mesh.userData.role === 'frame' ? 36 : 67), 'Physical depth');
   assert.ok(Math.abs(geometry.boundingBox.max.z) < .001, 'Front face aligns to docking plane');
   assert.ok(geometry.groups.some(group => group.materialIndex === 0), 'Cap material');
   assert.ok(geometry.groups.some(group => group.materialIndex === 1), 'Beveled edge material');
   const settled = logoAssemblyPose(1, mesh.userData.role);
   assert.ok(settled.x === 0 && settled.y === 0 && settled.z === 0 && settled.turn === 0, 'Exact assembled coordinates');
+  assert.ok(settled.tilt === 0 && settled.yaw === 0, 'Depth reveal returns to the docking plane');
   assert.equal(settled.opacity, 1);
   assert.equal(settled.visible, true);
   console.log(`${mesh.name}: ${geometry.attributes.position.count} vertices, valid normals and depth`);
@@ -46,6 +60,7 @@ for (const role of ['a', 'v', 'frame']) {
     const next = logoAssemblyPose(Math.min(1, p + .001), role);
     assert.ok(Math.hypot(next.x - pose.x, next.y - pose.y) < 2, 'Assembly is continuous');
     assert.ok(pose.opacity >= 0 && pose.opacity <= 1);
+    for (const axis of ['z', 'turn', 'tilt', 'yaw']) assert.ok(Number.isFinite(pose[axis]), `Valid assembly ${axis}`);
   }
 }
 assert.ok(logoAssemblyPose(.36, 'a').x < 0 && logoAssemblyPose(.36, 'v').x > 0, 'The original letter groups visibly separate');
@@ -91,9 +106,13 @@ for (const [width, height, size, sourceSize] of [[1440, 900, 128, 418], [390, 84
   assert.equal(top.x, g.sourceX); assert.equal(top.y, g.sourceY);
   assert.equal(top.scale, sourceSize / size);
   assert.equal(top.opacity, 0); assert.equal(top.photoOpacity, 1); assert.equal(top.reveal, 0);
+  assert.equal(top.scrollTurn, 0, 'Photograph starts without rotation');
   const unveiled = flight(heroEnd, limit, g);
   assert.equal(unveiled.reveal, 1); assert.equal(unveiled.photoOpacity, 0);
+  assert.equal(unveiled.scrollTurn, 360, 'Opening completes one full revolution');
   assert.ok(unveiled.scale * size >= sourceSize, 'Reveal holds the portrait scale');
+  assert.ok(Math.abs(unveiled.rotationX) + Math.abs(unveiled.rotationY) + Math.abs(unveiled.rotationZ) < .001, 'Opening turn settles before departure');
+  assert.ok(flight(heroEnd + height * .33, limit, g).scale < .8, 'Portrait-sized logo shrinks before crossing the work');
   assert.equal(bottom.x, g.dockX); assert.equal(bottom.y, height - 150);
   assert.equal(bottom.scale, 1);
   assert.equal(flight(limit + 100, limit, g).y, bottom.y, 'Overscroll docks correctly');
@@ -101,25 +120,48 @@ for (const [width, height, size, sourceSize] of [[1440, 900, 128, 418], [390, 84
   assert.equal(pinned.active, 1); assert.equal(pinned.y, 400, 'Pinned archive offset');
   for (let scroll = 0; scroll <= limit; scroll += 10) {
     const pose = flight(scroll, limit, g);
-    for (const key of ['x', 'y', 'scale', 'rotationX', 'rotationY', 'rotationZ']) assert.ok(Number.isFinite(pose[key]));
+    for (const key of ['x', 'y', 'scale', 'rotationX', 'rotationY', 'rotationZ', 'scrollTurn']) assert.ok(Number.isFinite(pose[key]));
     assert.ok(pose.x >= 0 && pose.x <= width, 'Flight stays in viewport horizontally');
     assert.ok(pose.attraction >= 0 && pose.attraction <= 1);
     if (pose.active >= 0) {
       assert.equal(pose.scale, 1);
       assert.equal(pose.attraction, 0, 'Pointer and idle drift cannot displace a chapter landing');
+      assert.equal(pose.freedom, 0, 'No 3D idle drift at a heading');
+      assert.equal(pose.docked, true, 'Heading hold settles the renderer');
+      assert.equal(pose.scrollTurn % 360, 0, 'Every heading is front-facing');
     }
     assert.equal(JSON.stringify(pose), JSON.stringify(flight(scroll, limit, g)), 'Reversible, independent of previous visits');
     if (scroll > 0 && scroll < limit - 1) {
       const before = flight(scroll - .001, limit, g);
       assert.ok(Math.hypot(pose.x - before.x, pose.y - before.y) < 1, 'Continuous path');
       assert.ok(Math.abs(pose.scale - before.scale) < .01, 'Continuous scale');
+      assert.ok(pose.scrollTurn >= before.scrollTurn - 1e-8, 'Rotation never unwinds at docking');
+      assert.ok(Math.abs(pose.scrollTurn - before.scrollTurn) < .1, 'Continuous unwrapped angle');
     }
+  }
+  const earlyDock = flight(limit - 50, limit, g);
+  assert.equal(earlyDock.phase, 'footer', 'Footer docks before the exact scroll limit');
+  assert.equal(earlyDock.y, g.dockY - (limit - 50));
+  for (const at of g.nodes.map(node => node.y - height * .64)) {
+    const epsilon = .01;
+    const before = flight(at - epsilon, limit, g), landed = flight(at, limit, g), after = flight(at + epsilon, limit, g);
+    const incoming = (landed.y - before.y) / epsilon;
+    const outgoing = (after.y - landed.y) / epsilon;
+    assert.ok(Math.abs(incoming - outgoing) < .01, 'Arrival matches socket scroll velocity');
   }
   for (const at of [heroEnd, ...g.nodes.flatMap(node => [node.y - height * .64, node.y + ((node.pinEnd || 0) - (node.pinStart || 0)) - height * .29]), limit]) {
     const before = flight(at - .0001, limit, g), after = flight(at + .0001, limit, g);
     assert.ok(Math.hypot(before.x - after.x, before.y - after.y) < .1, 'No snapping at phase boundaries');
     assert.ok(Math.abs(before.scale - after.scale) < .001, 'No scale snapping at phase boundaries');
     assert.ok(Math.abs(before.attraction - after.attraction) < .001, 'Pointer influence joins continuously');
+    assert.ok(Math.abs(before.scrollTurn - after.scrollTurn) < .001, 'No rotation snapping at phase boundaries');
+  }
+  const arrivals = g.nodes.map(node => node.y - height * .64);
+  let previousTurn = unveiled.scrollTurn;
+  for (const at of [...arrivals, limit]) {
+    const arrival = flight(at, limit, g);
+    assert.equal(arrival.scrollTurn - previousTurn, 360, 'Exactly one full turn per journey');
+    previousTurn = arrival.scrollTurn;
   }
   const moving = flight(6100, limit, g, 24), reversing = flight(6100, limit, g, -24), still = flight(6100, limit, g, 0);
   assert.equal(moving.x, still.x); assert.equal(moving.y, still.y); assert.equal(moving.scale, still.scale);

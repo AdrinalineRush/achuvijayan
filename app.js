@@ -64,63 +64,76 @@
     trigger, start: 'top bottom', end: 'bottom top',
     toggleActions: 'restart complete restart complete'
   });
-  // A reversible portrait reveal followed by free-flight intervals between
-  // measured title landings. Pointer attraction is layered on in the ticker.
+  // Follow the measured sockets during departure and approach. Blending into a
+  // bounded screen-space arc keeps long sections from throwing the mark offscreen.
   function logoFlightPose(scroll, limit, g, velocity = 0) {
     const clamp = v => Math.max(0, Math.min(1, v));
-    const smooth = v => { const t = clamp(v); return t * t * (3 - 2 * t); };
+    const settle = v => { const t = clamp(v); return t * t * t * (t * (t * 6 - 15) + 10); };
     const mix = (a, b, t) => a + (b - a) * t;
     const s = Math.max(0, Math.min(scroll, limit));
     const point = (node, at) => ({x: node.x, y: node.fixed ? node.y : node.y - at + Math.max(0, Math.min(at - (node.pinStart || 0), (node.pinEnd || 0) - (node.pinStart || 0)))});
     const momentum = Math.max(-16, Math.min(16, velocity * .5));
-    const base = {rotationX: 0, rotationY: 0, rotationZ: 0, energy: Math.min(1, Math.abs(velocity) / 35),
-      phase: 'chapter', reveal: 1, active: -1, attraction: 0, freedom: .15, opacity: 1, photoOpacity: 0, docked: false};
+    const base = {rotationX: 0, rotationY: 0, rotationZ: 0, scrollTurn: 360, energy: Math.min(1, Math.abs(velocity) / 35),
+      phase: 'chapter', reveal: 1, active: -1, attraction: 0, freedom: 0, opacity: 1, photoOpacity: 0, docked: true};
     const launchEnd = g.heroEnd || g.height * 1.35;
     const heroScale = g.sourceSize / g.size;
     if (s <= launchEnd) {
       const p = clamp(s / launchEnd);
-      const reveal = smooth((p - .06) / .72);
-      const beauty = smooth((p - .58) / .3);
-      return {...base, phase: 'reveal', reveal, x: g.sourceX, y: g.sourceY,
-        scale: heroScale * (1 + beauty * .08), opacity: smooth(p / .06),
-        photoOpacity: 1 - smooth(p / .08), freedom: beauty * .4,
-        rotationX: Math.sin(beauty * Math.PI) * -10,
-        rotationY: Math.sin(beauty * Math.PI) * -34,
-        rotationZ: Math.sin(beauty * Math.PI) * -3, attraction: 0};
+      const reveal = settle((p - .055) / .61);
+      const beauty = settle((p - .37) / .6);
+      const turn = Math.sin(beauty * Math.PI) ** 2;
+      return {...base, phase: 'reveal', reveal, x: g.sourceX, y: g.sourceY, docked: false,
+        scale: heroScale * (1 + settle((p - .4) / .44) * .045), opacity: settle(p / .035),
+        photoOpacity: 1 - settle((p - .035) / .065), freedom: 0,
+        rotationX: turn * -13,
+        rotationY: turn * -24,
+        rotationZ: turn * -2, scrollTurn: 360 * settle((p - .54) / .43), attraction: 0};
     }
-    if (s >= limit) return {...base, phase: 'footer', x: g.dockX, y: g.dockY - s, scale: g.dockSize / g.size, freedom: 0, docked: true};
-    const nodes = g.nodes.map((node, index) => ({...node, index, stopScale: 1,
+    const dockAdvance = Math.max(0, Math.min(96, g.height * .12, g.height - 24 - g.dockSize / 2 - (g.dockY - limit)));
+    const dockEnter = Math.max(launchEnd + 1, limit - dockAdvance);
+    const nodes = g.nodes.map((node, index) => ({...node, index, stopScale: (node.size || g.size) / g.size,
       enter: Math.max(launchEnd + 1, node.y - g.height * .64),
       leave: node.y + Math.max(0, (node.pinEnd || 0) - (node.pinStart || 0)) - g.height * .29
-    })).filter(node => node.enter < limit - 1);
-    nodes.push({x: g.dockX, y: g.dockY, enter: limit, leave: limit, index: -1, stopScale: g.dockSize / g.size});
-    nodes.forEach((node, index) => { node.leave = Math.max(node.enter, Math.min(node.leave, (nodes[index + 1]?.enter ?? limit) - g.height * .12)); });
-    let previous = {x: g.sourceX, y: g.sourceY, fixed: true, leave: launchEnd, index: -1, stopScale: heroScale * 1.08};
+    })).filter(node => node.enter < dockEnter - 1);
+    nodes.forEach((node, index) => { node.turn = (index + 2) * 360; });
+    nodes.push({x: g.dockX, y: g.dockY, enter: dockEnter, leave: limit, index: -1, turn: (nodes.length + 2) * 360, stopScale: g.dockSize / g.size});
+    nodes.forEach((node, index) => {
+      const next = nodes[index + 1];
+      node.leave = Math.max(node.enter, next ? Math.min(node.leave, next.enter - g.height * .12) : node.leave);
+    });
+    let previous = {x: g.sourceX, y: g.sourceY, fixed: true, leave: launchEnd, index: -1, turn: 360, stopScale: heroScale * 1.045};
     for (const node of nodes) {
       if (s >= node.enter && s <= node.leave) {
-        return {...base, ...point(node, s), scale: node.stopScale, active: node.index};
+        return {...base, ...point(node, s), phase: node.index < 0 ? 'footer' : 'chapter', scale: node.stopScale, active: node.index, scrollTurn: node.turn};
       }
       if (s < node.enter) {
-        const t = clamp((s - previous.leave) / Math.max(1, node.enter - previous.leave));
-        const a = point(previous, previous.leave), b = point(node, node.enter);
-        // Irrational phase spacing gives every journey its own screen-space
-        // composition. Smooth endpoint envelopes make docking and reversal exact.
-        const angle = (node.index + 2) * 2.399963;
-        const roamX = g.width * (.5 + Math.sin(angle) * .32);
-        const roamY = g.height * (.47 + Math.cos(angle * 1.37) * .17);
-        const u = smooth(t), envelope = Math.sin(t * Math.PI) ** 2;
-        const x = mix(a.x, b.x, u) + (roamX - mix(a.x, b.x, .5)) * envelope;
-        const y = mix(a.y, b.y, t) + (roamY - mix(a.y, b.y, .5)) * envelope;
-        return {...base, phase: 'transit', x, y,
-          scale: mix(previous.stopScale, node.stopScale, u) * (1 - envelope * .16),
-          attraction: envelope, freedom: .15 + envelope * .85,
-          rotationX: Math.sin(t * Math.PI * 2) * 12 + momentum * -.25 * envelope,
-          rotationY: Math.sin(angle) * envelope * 30 + momentum * .65 * envelope,
-          rotationZ: Math.cos(angle) * envelope * 9 + momentum * .2 * envelope};
+        const span = Math.max(1, node.enter - previous.leave);
+        const t = clamp((s - previous.leave) / span), u = settle(t);
+        const a = point(previous, s), b = point(node, s);
+        const ramp = Math.min(span * .5, g.height * .65);
+        const release = settle((s - previous.leave) / ramp);
+        const approach = settle((s - node.enter + ramp) / ramp);
+        const departureWeight = 1 - release, arrivalWeight = approach;
+        const envelope = Math.max(0, release - approach);
+        const side = (previous.x + node.x) / 2 < g.width / 2 ? 1 : -1;
+        const arc = Math.sin(t * Math.PI) ** 2;
+        const margin = g.size * .65 + 18;
+        const cruiseX = Math.max(margin, Math.min(g.width - margin,
+          mix(previous.x, node.x, u) + side * Math.min(g.width * .085, 110) * arc));
+        const cruiseY = g.height * (.48 - Math.sin(t * Math.PI * 2) * .035);
+        const x = a.x * departureWeight + cruiseX * envelope + b.x * arrivalWeight;
+        const y = a.y * departureWeight + cruiseY * envelope + b.y * arrivalWeight;
+        return {...base, phase: 'transit', docked: false, x, y,
+          scale: mix(mix(previous.stopScale, g.compact ? .76 : .68, release), node.stopScale, approach),
+          attraction: envelope, freedom: envelope * .45, opacity: 1 - envelope * .06,
+          rotationX: Math.sin(t * Math.PI * 2) * 6 * envelope - momentum * .1 * envelope,
+          rotationY: (side * 24 + momentum * .3) * envelope,
+          rotationZ: (side * -3.5 + momentum * .08) * envelope,
+          scrollTurn: mix(previous.turn, node.turn, u)};
       }
       previous = node;
     }
-    return {...base, x: g.dockX, y: g.dockY - s, scale: 1};
+    return {...base, phase: 'footer', x: g.dockX, y: g.dockY - s, scale: g.dockSize / g.size, scrollTurn: nodes[nodes.length - 1].turn};
   }
   let lenis = null;
   const motionToggle = $('.motion-toggle');
@@ -756,7 +769,7 @@
       }
       gsap.delayedCall(1.8, () => mark.classList.remove('is-playing'));
     });
-    import('./vendor/logo-sculpture.js?v=20261102-portrait-flight')
+    import('./vendor/logo-sculpture.js?v=20261103-titanium-reveal')
       .then(({createLogoSculpture}) => createLogoSculpture(mark, gsap.ticker))
       .then(controller => {
         logoSculpture = controller;
@@ -841,7 +854,7 @@
 
     const mm = gsap.matchMedia();
     const heroHold = sculptedSignature ? ScrollTrigger.create({
-      trigger: '.hero', start: 'top top', end: () => `+=${innerHeight * (narrow.matches ? 1.15 : 1.4)}`,
+      trigger: '.hero', start: 'top top', end: () => `+=${innerHeight * (narrow.matches ? 1.05 : 1.3)}`,
       pin: true, pinSpacing: true, anticipatePin: 1, invalidateOnRefresh: true, refreshPriority: 10
     }) : null;
 
@@ -893,6 +906,7 @@
         const setScaleY = gsap.quickSetter(visual, 'scaleY');
         const setOpacity = gsap.quickSetter(visual, 'opacity');
         const setFallbackOpacity = gsap.quickSetter($('.signature-fallback'), 'opacity');
+        const setFallbackTurn = gsap.quickSetter($('.signature-fallback'), 'rotationY', 'deg');
         const setSourceOpacity = gsap.quickSetter(source, 'opacity');
         const mark = $('.signature-mark');
         gsap.set(visual, {xPercent: -50, yPercent: -50, opacity: 1, force3D: false});
@@ -901,24 +915,46 @@
           if (!geometry || document.hidden || root.classList.contains('is-locked')) return;
           const dt = Math.min(.05, Math.max(.001, time - lastTick));
           lastTick = time;
+          // An early swipe accelerates the entrance to its landing rather
+          // than snapping the still-moving portrait and name to their ends.
+          if (lenis.scroll > 4 && heroEntrance?.progress() < 1) heroEntrance.timeScale(3);
           const pose = logoFlightPose(lenis.scroll, lenis.limit, geometry, lenis.velocity || 0);
-          // Attraction never exceeds a small fraction of the distance to the
-          // pointer. It fades to exactly zero at every deliberate landing.
-          const weight = compact ? 0 : pose.attraction;
-          const tx = pointer.active ? gsap.utils.clamp(-100, 100, (pointer.x - pose.x) * .19) : 0;
-          const ty = pointer.active ? gsap.utils.clamp(-72, 72, (pointer.y - pose.y) * .16) : 0;
-          const damping = 1 - Math.exp(-dt * 4.5);
+          // During a hold, use the actual socket. Pins can settle a fraction of
+          // a frame after a refresh; this also removes fractional-pixel drift.
+          const socket = pose.phase === 'reveal' ? source : pose.phase === 'footer' ? dock : anchors[pose.active];
+          if (socket) {
+            const rect = socket.getBoundingClientRect();
+            pose.x = rect.left + rect.width / 2;
+            pose.y = rect.top + rect.height / 2;
+          }
+          // A local magnetic field draws the finished sculpture toward a
+          // nearby cursor. The underlying scroll path stays anchored, so the
+          // mark returns to the same socket when the pointer leaves.
+          const dx = pointer.x - pose.x, dy = pointer.y - pose.y;
+          const radius = Math.min(380, geometry.width * .32);
+          const proximity = Math.max(0, 1 - Math.hypot(dx, dy) / radius);
+          const release = gsap.utils.clamp(0, 1, (pose.reveal - .75) / .25);
+          const magnet = !compact && pointer.active ? proximity * proximity * (3 - 2 * proximity) * release : 0;
+          const weight = compact ? 0 : Math.max(pose.attraction * .65, magnet);
+          const tx = pointer.active ? gsap.utils.clamp(-46, 46, dx * .32) * weight : 0;
+          const ty = pointer.active ? gsap.utils.clamp(-34, 34, dy * .28) * weight : 0;
+          const damping = 1 - Math.exp(-dt * 5.8);
           attraction.x += (tx - attraction.x) * damping;
           attraction.y += (ty - attraction.y) * damping;
-          const driftX = Math.sin(time * .63 + lenis.scroll * .0007) * 12;
-          const driftY = Math.cos(time * .51 + lenis.scroll * .0004) * 9;
-          const radius = geometry.size * pose.scale * .52;
-          const x = gsap.utils.clamp(radius + 8, geometry.width - radius - 8, pose.x + (attraction.x + driftX) * weight);
-          const y = pose.y + (attraction.y + driftY) * weight;
+          const driftX = Math.sin(time * .63 + lenis.scroll * .0007) * 2.5;
+          const driftY = Math.cos(time * .51 + lenis.scroll * .0004) * 2;
+          // The path itself reserves edge clearance. Clamping the whole mark
+          // here would move a measured socket and create a kink on arrival.
+          const safeEdge = Math.min(geometry.size * pose.scale * .48 + 10, geometry.width / 2);
+          const pullX = gsap.utils.clamp(Math.min(0, safeEdge - pose.x), Math.max(0, geometry.width - safeEdge - pose.x), attraction.x);
+          const x = pose.x + pullX + driftX * pose.attraction;
+          const y = pose.y + attraction.y + driftY * pose.attraction;
+          pose.magnet = magnet;
+          logoSculpture?.setPointer(gsap.utils.clamp(-1, 1, dx / radius), gsap.utils.clamp(-1, 1, dy / radius));
           setX(x); setY(y); setScaleX(pose.scale); setScaleY(pose.scale); setOpacity(pose.opacity);
-          visual.dataset.phase = pose.phase;
+          if (visual.dataset.phase !== pose.phase) visual.dataset.phase = pose.phase;
           visual.style.setProperty('--flight-energy', (pose.phase === 'chapter' ? .1 : pose.energy).toFixed(3));
-          const interactive = pose.opacity > .9 && pose.reveal > .9;
+          const interactive = pose.opacity > .9 && pose.reveal > .9 && pose.phase !== 'transit';
           mark.tabIndex = interactive ? 0 : -1;
           mark.style.pointerEvents = interactive ? 'auto' : 'none';
           if (mark.getAttribute('aria-hidden') !== String(!interactive)) mark.setAttribute('aria-hidden', String(!interactive));
@@ -928,6 +964,7 @@
           const gpuReady = logoSculpture?.ready;
           setSourceOpacity(gpuReady ? pose.photoOpacity : (pose.phase === 'reveal' ? 1 - pose.reveal : 0));
           setFallbackOpacity(gpuReady || pose.phase !== 'reveal' ? 1 : pose.reveal);
+          if (!gpuReady) setFallbackTurn(pose.scrollTurn + pose.rotationY);
           if (activeIndex !== pose.active) {
             activeIndex = pose.active;
             anchors.forEach((anchor, index) => anchor.parentElement.classList.toggle('is-logo-active', index === activeIndex));
@@ -936,14 +973,14 @@
         const measure = () => {
           geometryFrame = 0;
           const sourceRect = source.getBoundingClientRect();
+          const heroRect = $('.hero').getBoundingClientRect();
           const dockRect = dock.getBoundingClientRect();
           const pins = ScrollTrigger.getAll().filter(trigger => trigger.vars.pin);
-          const heroShift = heroHold ? Math.max(0, Math.min(scrollY - heroHold.start, heroHold.end - heroHold.start)) : 0;
           geometry = {
-            compact, width: root.clientWidth, height: innerHeight, size: visual.offsetWidth,
+            compact, width: root.clientWidth, height: innerHeight, size: parseFloat(getComputedStyle(visual).width),
             heroEnd: heroHold?.end || innerHeight * 1.4,
             sourceX: sourceRect.left + sourceRect.width / 2,
-            sourceY: sourceRect.top + scrollY - heroShift + sourceRect.height / 2,
+            sourceY: sourceRect.top - heroRect.top + sourceRect.height / 2,
             sourceSize: sourceRect.width,
             dockX: dockRect.left + dockRect.width / 2,
             dockY: dockRect.top + scrollY + dockRect.height / 2,
@@ -951,8 +988,12 @@
             nodes: anchors.map(anchor => {
               const rect = anchor.getBoundingClientRect();
               const pin = pins.find(trigger => trigger.trigger.contains(anchor));
-              const shift = pin ? Math.max(0, Math.min(scrollY - pin.start, pin.end - pin.start)) : 0;
-              return {x: rect.left + rect.width / 2, y: rect.top + scrollY + rect.height / 2 - shift,
+              // Measure from the stable spacer rather than subtracting the
+              // current pin shift, which can be stale during refresh callbacks.
+              const pinRect = pin?.pin.getBoundingClientRect();
+              const spacerRect = pin?.pin.parentElement.getBoundingClientRect();
+              const top = pin ? spacerRect.top + rect.top - pinRect.top : rect.top;
+              return {x: rect.left + rect.width / 2, y: top + scrollY + rect.height / 2, size: rect.width,
                 pinStart: pin?.start || 0, pinEnd: pin?.end || 0};
             })
           };
@@ -980,7 +1021,6 @@
         if (context.conditions.fine && !compact) {
           const follow = event => {
             pointer = {x: event.clientX, y: event.clientY, active: true};
-            logoSculpture?.setPointer(event.clientX / innerWidth - .5, event.clientY / innerHeight - .5);
           };
           const settle = () => { pointer.active = false; logoSculpture?.setPointer(0, 0); };
           addEventListener('pointermove', follow, {passive: true});

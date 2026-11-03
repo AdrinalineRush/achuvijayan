@@ -372,7 +372,7 @@ const TRAILER_CUTS = [
 ];
 
 /**
- * Fully AI films, shown as screens in "05 / AI filmmaking".
+ * Fully AI films, shown as screens in "04 / AI filmmaking".
  * A 9:16 film goes on the phone; 16:9 films go on cinema screens.
  * Own files: `loop` is the silent web loop, `full` the version with sound. YouTube films: `youtube` id.
  * `credit` is the one-line story of what I did, shown under the title.
