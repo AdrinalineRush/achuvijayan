@@ -764,14 +764,15 @@ html.motion[data-theme=light] .hud{color:var(--fg);background:rgba(239,242,228,.
 .motion .signature-flight.is-ready{visibility:visible}
 .motion.is-locked .signature-flight.is-ready{visibility:hidden}
 .signature-flight *{pointer-events:none}
-.signature-visual{--flight-energy:0;position:absolute;left:0;top:0;width:var(--chapter-mark,88px);aspect-ratio:1;opacity:0;isolation:isolate;will-change:transform}
+.signature-visual{--flight-energy:0;--pointer-presence:0;--light-x:50%;--light-y:50%;position:absolute;left:0;top:0;width:var(--chapter-mark,88px);aspect-ratio:1;opacity:0;isolation:isolate;will-change:transform}
+.signature-visual::after{content:'';position:absolute;z-index:-1;inset:-28%;border-radius:50%;background:radial-gradient(ellipse at var(--light-x) var(--light-y),#c2da8530,transparent 64%);opacity:calc(var(--pointer-presence) * .45);pointer-events:none}
 .signature-visual::before{content:'';position:absolute;z-index:-1;left:12%;right:12%;height:14%;bottom:-12%;border-radius:50%;background:radial-gradient(ellipse,#0007,transparent 68%);opacity:.24;transform:scaleX(.85);transition:opacity .5s,transform .8s var(--ease);pointer-events:none}
 .signature-visual[data-phase=transit]::before{opacity:.06;transform:scaleX(1.3)}
 .signature-visual[data-phase=reveal]::before{opacity:0}
 .signature-visual[data-phase=footer]::before{opacity:.24;transform:scaleX(.9)}
 .signature-mark{position:absolute;inset:0;pointer-events:auto;touch-action:manipulation;border-radius:14px;outline-offset:8px}
 .signature-mark:focus-visible{outline:1px solid var(--accent)}
-.signature-hint{position:absolute;top:calc(100% + 20px);left:50%;white-space:nowrap;transform:translate(-50%,4px);opacity:0;font:500 9px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);transition:opacity .25s,transform .35s}
+.signature-hint{position:absolute;top:calc(100% + 20px);left:50%;white-space:nowrap;transform:translate(-50%,4px);opacity:0;font:500 9px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--fg);background:var(--bg);border:1px solid var(--glass-edge);border-radius:20px;padding:9px 11px;transition:opacity .25s,transform .35s}
 .signature-mark:focus-visible .signature-hint{opacity:1;transform:translate(-50%,0)}
 .signature-visual[data-phase=reveal] .signature-hint,.signature-visual[data-phase=transit] .signature-hint{display:none}
 @media(hover:hover){.signature-mark:hover:not(.is-playing) .signature-hint{opacity:1;transform:translate(-50%,0)}}

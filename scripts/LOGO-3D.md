@@ -26,8 +26,8 @@ The plane sits at the front-face depth, so perspective cannot change their image
 alignment. Contour masking releases the photo before the letter groups separate;
 a directional shader sweep then resolves their photographic surfaces into metal.
 The perspective camera is calibrated to the same 140% overscan as the canvas,
-preserving the measured SVG size at every dock. A dark studio and six separate
-softboxes shape the metal. All materials compile before the first visible frame.
+preserving the measured SVG size at every dock. Eight studio panels, including
+a dark flag, shape the metal. All materials compile before the first visible frame.
 
 With the local server running, open `/scripts/review-logo.html` to inspect six
 fixed production-renderer checkpoints and both themes. The review page is local
@@ -52,18 +52,33 @@ Implementation references: [ExtrudeGeometry](https://threejs.org/docs/pages/Extr
 [SVGLoader](https://threejs.org/docs/pages/SVGLoader.html),
 [RoomEnvironment](https://threejs.org/docs/pages/RoomEnvironment.html).
 
-The refined reveal uses smaller, staggered A/V excursions and overlaps its
-material sweep with the hero revolution. Letter bevels are 5 units wide and
+The refined reveal uses smaller, staggered A/V excursions and finishes its
+material sweep before the hero revolution, leaving a readable assembled beat.
+Letter bevels are 5 units wide and
 6.5 units deep with six segments and creased-normal smoothing. The thin corner
-brackets use their own 1.6-unit bevel and 30-unit extrusion. Six shaped softboxes,
-curved cap normals and satin titanium surfaces create continuous reflections.
+brackets use their own 1.6-unit bevel and 30-unit extrusion. Shaped softboxes,
+object-space cap normals and brushed titanium surfaces create continuous reflections.
+The subtle roughness texture filters out at subpixel scale to avoid shimmer.
 Canvas resolution changes occur in the draw callback, and the first GPU frame
 replaces its fallback without an independent opacity transition. Early scrolls
 accelerate the portrait entrance instead of force-completing it.
 
 Desktop pointer attraction uses a smooth 380px proximity falloff after the photo
-is released. The DOM position and 3D tilt both damp toward the cursor, and return
-to the measured socket when it leaves. Touch and reduced-motion layouts do not
+is released. A critically damped spring moves the DOM position; normalized
+object-size pointer coordinates drive up to 22° yaw and 16° pitch, plus moving
+reflections and key/rim lights. The complete proximity force is damped before
+rendering. Heading displacement is bounded to 14px / 10.5px, travel to 36px / 27px.
+Inactive pointers clear their targets and return to the measured socket.
+Touch and reduced-motion layouts do not
 apply this magnetic effect. The review page includes a
 ten-second playback and a scrubber for inspecting the entire opening in either
 direction, in addition to the fixed checkpoints.
+
+Docked headings and the footer keep a 24-degree-per-second turn around the
+vertical axis, with no autonomous translation or scaling. Proximity interaction
+slows the turn smoothly to 7.2 degrees per second at full engagement.
+A separate angle accumulator
+eases its speed on arrival/departure and carries its orientation into travel.
+Returning to the reveal rebases whole revolutions and smoothly restores photo
+alignment. Hidden tabs and dialogs pause the turn without catching up on resume.
+The `Docked rotation` review checkpoint previews this motion at portrait scale.

@@ -79,15 +79,16 @@
     const heroScale = g.sourceSize / g.size;
     if (s <= launchEnd) {
       const p = clamp(s / launchEnd);
-      const reveal = settle((p - .055) / .61);
-      const beauty = settle((p - .37) / .6);
+      // Give the finished face a quiet beat before the studio revolution.
+      const reveal = settle((p - .06) / .48);
+      const beauty = settle((p - .32) / .64);
       const turn = Math.sin(beauty * Math.PI) ** 2;
       return {...base, phase: 'reveal', reveal, x: g.sourceX, y: g.sourceY, docked: false,
         scale: heroScale * (1 + settle((p - .4) / .44) * .045), opacity: settle(p / .035),
         photoOpacity: 1 - settle((p - .035) / .065), freedom: 0,
         rotationX: turn * -13,
         rotationY: turn * -24,
-        rotationZ: turn * -2, scrollTurn: 360 * settle((p - .54) / .43), attraction: 0};
+        rotationZ: turn * -2, scrollTurn: 360 * settle((p - .59) / .36), attraction: 0};
     }
     const dockAdvance = Math.max(0, Math.min(96, g.height * .12, g.height - 24 - g.dockSize / 2 - (g.dockY - limit)));
     const dockEnter = Math.max(launchEnd + 1, limit - dockAdvance);
@@ -124,16 +125,48 @@
         const x = a.x * departureWeight + cruiseX * envelope + b.x * arrivalWeight;
         const y = a.y * departureWeight + cruiseY * envelope + b.y * arrivalWeight;
         return {...base, phase: 'transit', docked: false, x, y,
-          scale: mix(mix(previous.stopScale, g.compact ? .76 : .68, release), node.stopScale, approach),
-          attraction: envelope, freedom: envelope * .45, opacity: 1 - envelope * .06,
-          rotationX: Math.sin(t * Math.PI * 2) * 6 * envelope - momentum * .1 * envelope,
+          scale: mix(mix(previous.stopScale, g.compact ? .84 : .8, release), node.stopScale, approach),
+          attraction: envelope, freedom: envelope * .35, opacity: 1,
+          rotationX: Math.sin(t * Math.PI * 2) * 9 * envelope - momentum * .1 * envelope,
           rotationY: (side * 24 + momentum * .3) * envelope,
-          rotationZ: (side * -3.5 + momentum * .08) * envelope,
+          rotationZ: (side * -5 * Math.cos(t * Math.PI) + momentum * .08) * envelope,
           scrollTurn: mix(previous.turn, node.turn, u)};
       }
       previous = node;
     }
     return {...base, phase: 'footer', x: g.dockX, y: g.dockY - s, scale: g.dockSize / g.size, scrollTurn: nodes[nodes.length - 1].turn};
+  }
+
+  // The broad field controls engagement; the object's own size controls tilt.
+  // Keeping these separate makes nearby mouse movement visibly responsive.
+  function logoPointerPose(pointer, pose, geometry) {
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const empty = {x: 0, y: 0, tiltX: 0, tiltY: 0, magnet: 0};
+    if (!pointer.active || geometry.compact || pose.reveal <= .88) return empty;
+    const dx = pointer.x - pose.x, dy = pointer.y - pose.y;
+    const radius = Math.min(380, geometry.width * .38);
+    const proximity = clamp(1 - Math.hypot(dx, dy) / radius, 0, 1);
+    const ready = clamp((pose.reveal - .88) / .12, 0, 1);
+    const release = ready * ready * (3 - 2 * ready);
+    const magnet = Math.max(proximity * proximity * (3 - 2 * proximity), pose.attraction * .2) * release;
+    const localRadius = Math.max(48, geometry.size * pose.scale * .7);
+    const reach = pose.docked ? 14 : 36;
+    return {
+      x: clamp(dx * .26, -reach, reach) * magnet,
+      y: clamp(dy * .23, -reach * .75, reach * .75) * magnet,
+      tiltX: clamp(dx / localRadius, -1, 1), tiltY: clamp(dy / localRadius, -1, 1), magnet
+    };
+  }
+
+  // Exact critically damped spring: the same weight at 30, 60 and 120 Hz,
+  // without an Euler step's jitter or a long tail when the mouse leaves.
+  function logoPointerSpring(state, target, delta) {
+    const dt = Math.max(0, Math.min(.05, delta)), frequency = 14;
+    const decay = Math.exp(-frequency * dt);
+    const offset = state.value - target;
+    const impulse = state.velocity + frequency * offset;
+    return {value: target + (offset + impulse * dt) * decay,
+      velocity: (state.velocity - frequency * impulse * dt) * decay};
   }
   let lenis = null;
   const motionToggle = $('.motion-toggle');
@@ -769,7 +802,7 @@
       }
       gsap.delayedCall(1.8, () => mark.classList.remove('is-playing'));
     });
-    import('./vendor/logo-sculpture.js?v=20261103-titanium-reveal')
+    import('./vendor/logo-sculpture.js?v=20261104-responsive-metal')
       .then(({createLogoSculpture}) => createLogoSculpture(mark, gsap.ticker))
       .then(controller => {
         logoSculpture = controller;
@@ -899,7 +932,7 @@
         const compact = context.conditions.compact;
         let geometry, geometryFrame = 0, activeIndex = -1;
         let pointer = {x: innerWidth / 2, y: innerHeight / 2, active: false};
-        let attraction = {x: 0, y: 0}, lastTick = 0;
+        let attractionX = {value: 0, velocity: 0}, attractionY = {value: 0, velocity: 0}, lastTick = 0;
         const setX = gsap.quickSetter(visual, 'x', 'px');
         const setY = gsap.quickSetter(visual, 'y', 'px');
         const setScaleX = gsap.quickSetter(visual, 'scaleX');
@@ -930,30 +963,25 @@
           // A local magnetic field draws the finished sculpture toward a
           // nearby cursor. The underlying scroll path stays anchored, so the
           // mark returns to the same socket when the pointer leaves.
-          const dx = pointer.x - pose.x, dy = pointer.y - pose.y;
-          const radius = Math.min(380, geometry.width * .32);
-          const proximity = Math.max(0, 1 - Math.hypot(dx, dy) / radius);
-          const release = gsap.utils.clamp(0, 1, (pose.reveal - .75) / .25);
-          const magnet = !compact && pointer.active ? proximity * proximity * (3 - 2 * proximity) * release : 0;
-          const weight = compact ? 0 : Math.max(pose.attraction * .65, magnet);
-          const tx = pointer.active ? gsap.utils.clamp(-46, 46, dx * .32) * weight : 0;
-          const ty = pointer.active ? gsap.utils.clamp(-34, 34, dy * .28) * weight : 0;
-          const damping = 1 - Math.exp(-dt * 5.8);
-          attraction.x += (tx - attraction.x) * damping;
-          attraction.y += (ty - attraction.y) * damping;
+          const response = logoPointerPose(pointer, pose, geometry);
+          attractionX = logoPointerSpring(attractionX, response.x, dt);
+          attractionY = logoPointerSpring(attractionY, response.y, dt);
           const driftX = Math.sin(time * .63 + lenis.scroll * .0007) * 2.5;
           const driftY = Math.cos(time * .51 + lenis.scroll * .0004) * 2;
           // The path itself reserves edge clearance. Clamping the whole mark
           // here would move a measured socket and create a kink on arrival.
           const safeEdge = Math.min(geometry.size * pose.scale * .48 + 10, geometry.width / 2);
-          const pullX = gsap.utils.clamp(Math.min(0, safeEdge - pose.x), Math.max(0, geometry.width - safeEdge - pose.x), attraction.x);
+          const pullX = gsap.utils.clamp(Math.min(0, safeEdge - pose.x), Math.max(0, geometry.width - safeEdge - pose.x), attractionX.value);
           const x = pose.x + pullX + driftX * pose.attraction;
-          const y = pose.y + attraction.y + driftY * pose.attraction;
-          pose.magnet = magnet;
-          logoSculpture?.setPointer(gsap.utils.clamp(-1, 1, dx / radius), gsap.utils.clamp(-1, 1, dy / radius));
+          const y = pose.y + attractionY.value + driftY * pose.attraction;
+          pose.magnet = response.magnet;
+          logoSculpture?.setPointer(response.tiltX, response.tiltY);
           setX(x); setY(y); setScaleX(pose.scale); setScaleY(pose.scale); setOpacity(pose.opacity);
           if (visual.dataset.phase !== pose.phase) visual.dataset.phase = pose.phase;
           visual.style.setProperty('--flight-energy', (pose.phase === 'chapter' ? .1 : pose.energy).toFixed(3));
+          visual.style.setProperty('--pointer-presence', response.magnet.toFixed(3));
+          visual.style.setProperty('--light-x', `${50 + response.tiltX * 22}%`);
+          visual.style.setProperty('--light-y', `${50 + response.tiltY * 22}%`);
           const interactive = pose.opacity > .9 && pose.reveal > .9 && pose.phase !== 'transit';
           mark.tabIndex = interactive ? 0 : -1;
           mark.style.pointerEvents = interactive ? 'auto' : 'none';

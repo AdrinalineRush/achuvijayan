@@ -22,7 +22,7 @@
     <button data-reveal=".36" aria-pressed="false">03 / Relief</button>
     <button data-reveal=".62" aria-pressed="false">04 / Material</button>
     <button data-reveal="1" data-turn="true" aria-pressed="false">05 / Studio turn</button>
-    <button data-reveal="1" aria-pressed="false">06 / Docked</button>
+    <button data-reveal="1" data-docked="true" aria-pressed="false">06 / Docked rotation</button>
   </nav>
   <button id="theme">Switch theme</button>
   <button id="play" type="button">Play full reveal</button>
@@ -32,20 +32,20 @@
 </aside>
 <main class="stage"><div class="signature-mark" aria-label="Production logo"></div></main>
 <script type="module">
-  import {createLogoSculpture} from '../vendor/logo-sculpture.js?v=20261103-titanium-reveal';
+  import {createLogoSculpture} from '../vendor/logo-sculpture.js?v=20261104-responsive-metal';
   const callbacks=new Set();
   const ticker={time:0,add:fn=>callbacks.add(fn),remove:fn=>callbacks.delete(fn)};
   function frame(t){ticker.time=t/1000;callbacks.forEach(fn=>fn(ticker.time));requestAnimationFrame(frame)}
   requestAnimationFrame(frame);
   try {
     const sculpture=await createLogoSculpture(document.querySelector('.signature-mark'),ticker);
-    const pose=(reveal,turn=false)=>({phase:'reveal',reveal,opacity:1,scale:3,active:-1,docked:false,freedom:0,rotationX:turn?-10:0,rotationY:turn?-32:0,rotationZ:turn?-2.5:0});
+    const pose=(reveal,turn=false,docked=false)=>({phase:docked?'chapter':'reveal',reveal,opacity:1,scale:3,active:docked?0:-1,docked,freedom:0,rotationX:turn?-10:0,rotationY:turn?-32:0,rotationZ:turn?-2.5:0});
     let playing=false, started=0;
     const progress=document.querySelector('#progress'), play=document.querySelector('#play');
     const ease=v=>{const t=Math.max(0,Math.min(1,v));return t*t*t*(t*(t*6-15)+10)};
     const show=p=>{
-      const beauty=Math.sin(ease((p-.37)/.6)*Math.PI)**2;
-      sculpture.setPose({...pose(ease((p-.055)/.61)),rotationX:-13*beauty,rotationY:-24*beauty,rotationZ:-2*beauty,scrollTurn:360*ease((p-.54)/.43)});
+      const beauty=Math.sin(ease((p-.32)/.64)*Math.PI)**2;
+      sculpture.setPose({...pose(ease((p-.06)/.48)),rotationX:-13*beauty,rotationY:-24*beauty,rotationZ:-2*beauty,scrollTurn:360*ease((p-.59)/.36)});
       progress.value=Math.round(p*1000);
     };
     const stop=()=>{playing=false;play.textContent='Play full reveal'};
@@ -56,7 +56,7 @@
     document.querySelectorAll('[data-reveal]').forEach(button=>button.addEventListener('click',()=>{
       stop();
       document.querySelectorAll('[data-reveal]').forEach(el=>el.setAttribute('aria-pressed',String(el===button)));
-      sculpture.setPose(pose(Number(button.dataset.reveal),!!button.dataset.turn));
+      sculpture.setPose(pose(Number(button.dataset.reveal),!!button.dataset.turn,!!button.dataset.docked));
       document.querySelector('#status').textContent=button.textContent;
     }));
     document.querySelector('#theme').onclick=()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='light'?'dark':'light';document.body.style.background=document.documentElement.dataset.theme==='light'?'#e9e5dc':'#0b0b0a';};

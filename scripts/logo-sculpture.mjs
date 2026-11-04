@@ -16,20 +16,26 @@ export function buildLogoModel(svg) {
   const centreX = left + width / 2, centreY = top + height / 2;
   const model = new Group();
   const silver = new MeshPhysicalMaterial({
-    color: 0xc5ccd2, metalness: 1, roughness: .23, anisotropy: .32,
-    clearcoat: .28, clearcoatRoughness: .24, envMapIntensity: 1.2
+    color: 0xd3dade, metalness: .96, roughness: .205, anisotropy: .38,
+    clearcoat: .32, clearcoatRoughness: .2, envMapIntensity: 1.22
   });
   const edge = new MeshPhysicalMaterial({
-    color: 0x536373, metalness: .96, roughness: .3,
-    clearcoat: .32, clearcoatRoughness: .22, envMapIntensity: 1.3
+    color: 0x394954, metalness: .98, roughness: .235,
+    clearcoat: .4, clearcoatRoughness: .18, envMapIntensity: 1.35
   });
   const lime = new MeshPhysicalMaterial({
-    color: 0xbeff1f, metalness: .35, roughness: .26,
-    clearcoat: .55, clearcoatRoughness: .2, envMapIntensity: .7,
-    emissive: 0x486b00, emissiveIntensity: .08
+    color: 0xbeff1f, metalness: .24, roughness: .24,
+    clearcoat: .8, clearcoatRoughness: .16, envMapIntensity: .72,
+    emissive: 0x486b00, emissiveIntensity: .06
   });
-  const limeEdge = new MeshPhysicalMaterial({color: 0x597d19, metalness: .85, roughness: .26});
+  const limeEdge = new MeshPhysicalMaterial({color: 0x4b6818, metalness: .84, roughness: .23, clearcoat: .35});
   const frameSilver = silver.clone(), frameEdge = edge.clone();
+  // Keep the fine crop marks quieter than the monogram, with a satin finish
+  // that remains legible when their narrow bevels catch a studio strip.
+  frameSilver.color.set(0x9daab2);
+  frameSilver.roughness = .32;
+  frameSilver.envMapIntensity = 1.05;
+  frameEdge.roughness = .3;
   const materials = [silver, edge, lime, limeEdge, frameSilver, frameEdge];
   for (const path of parsed.paths) {
     const shapes = path.toShapes();
@@ -110,6 +116,29 @@ export function logoInteractionPose(elapsed) {
   return {active: true, turn: ease * 360, tilt: bloom * 16, lift: bloom * 24, scale: 1 + bloom * .08, glow: bloom};
 }
 
+// A slow turn continues in the docking socket. Carry its angle into travel
+// instead of resetting on departure; only its angular speed eases away.
+export function logoDockRotation(state, pose, delta) {
+  const revealing = pose.phase === 'reveal';
+  let {angle, speed} = state;
+  if (revealing) {
+    // Return to the photograph by the shortest equivalent rotation, even
+    // after several minutes of docked turns. Never unwind the accumulated laps.
+    if (!state.revealing) angle = MathUtils.euclideanModulo(angle + 180, 360) - 180;
+    const gate = MathUtils.smootherstep(pose.reveal ?? 1, .65, 1);
+    if (gate === 0) angle = 0;
+    return {angle, speed: 0, revealing, rotation: angle * gate};
+  }
+  const dt = MathUtils.clamp(delta, 0, .05);
+  const engagement = MathUtils.clamp(pose.magnet || 0, 0, 1);
+  const target = pose.docked && (pose.reveal ?? 1) >= .99 ? 24 * (1 - engagement * .7) : 0;
+  const decay = Math.exp(-4 * dt);
+  // Integrate the damped speed exactly so 30/60/120 Hz share the same pace.
+  angle += target * dt + (speed - target) * (1 - decay) / 4;
+  speed = target + (speed - target) * decay;
+  return {angle, speed, revealing, rotation: angle};
+}
+
 export async function createLogoSculpture(host, ticker) {
   let renderer, environment, studio, model, portrait, photo, mask, materials = [], resizeObserver, themeObserver;
   let disposed = false, contextLost = false, visible = true, ready = false;
@@ -117,6 +146,7 @@ export async function createLogoSculpture(host, ticker) {
   let pointer = {x: 0, y: 0}, pointerTarget = {x: 0, y: 0};
   let lastFrame = 0, previousActive = -1, arrivalStart = -10, needsFrame = true;
   let interactionStart = -10;
+  let dockRotation = {angle: 0, speed: 0, revealing: true, rotation: 0};
   let bufferSize = 0;
   let theme = '', scene, camera, key, rim;
   const materialReveal = {value: 0};
@@ -131,44 +161,49 @@ export async function createLogoSculpture(host, ticker) {
     if (!scene) return;
     const day = root.dataset.theme === 'light';
     theme = day ? 'light' : 'dark';
-    materials[0].color.set(day ? 0x697d8d : 0xc5ccd2);
-    materials[1].color.set(day ? 0x3c4d60 : 0x536373);
+    materials[0].color.set(day ? 0x71818c : 0xd3dade);
+    materials[1].color.set(day ? 0x30404d : 0x394954);
     materials[2].color.set(day ? 0x8ebc24 : 0xbeff1f);
-    materials[4].color.copy(materials[0].color);
+    materials[4].color.set(day ? 0x687984 : 0x9daab2);
     materials[5].color.copy(materials[1].color);
-    scene.environmentIntensity = day ? .9 : 1;
-    renderer.toneMappingExposure = day ? .97 : 1.02;
+    scene.environmentIntensity = day ? .92 : 1;
+    renderer.toneMappingExposure = day ? .97 : 1;
     needsFrame = true;
   }
 
   function draw(time) {
     if (disposed || contextLost || !visible || document.hidden || root.classList.contains('is-locked')) return;
     // Up to 60 fps for the small scene. The DOM travel follows Lenis at
-    // display refresh rate. Docked logos render only when something changes.
+    // display refresh rate. A docked sculpture keeps its slow studio turn.
     if (time - lastFrame < 1 / 60 - .001) return;
     const interaction = logoInteractionPose(time - interactionStart);
-    const settling = Math.abs(attitude.x) + Math.abs(attitude.y) + Math.abs(attitude.z) > .01;
+    const settling = Math.abs(attitude.x) + Math.abs(attitude.y) + Math.abs(attitude.z) > .01
+      || Math.abs(pointer.x) + Math.abs(pointer.y) > .001;
     const arriving = time - arrivalStart < 1.1;
-    if (ready && (pose.opacity === 0 || (pose.docked && !settling && !arriving)) && !needsFrame && !interaction.active) return;
+    const turning = (pose.docked && pose.phase !== 'reveal' && (pose.reveal ?? 1) >= .99) || dockRotation.speed > .001;
+    if (ready && (pose.opacity === 0 || (pose.docked && !settling && !arriving && !turning)) && !needsFrame && !interaction.active) return;
     const dt = Math.min(.05, Math.max(.001, time - lastFrame));
     lastFrame = time;
+    dockRotation = logoDockRotation(dockRotation, pose, dt);
     const floating = !pose.docked;
     const freedom = floating ? pose.freedom : 0;
-    const magnet = pose.magnet || 0;
+    const magnet = MathUtils.clamp(pose.magnet || 0, 0, 1);
     const energy = MathUtils.clamp(pose.energy || 0, 0, 1);
     const arrivalProgress = MathUtils.clamp((time - arrivalStart) / 1.1, 0, 1);
     const arrival = Math.sin(arrivalProgress * Math.PI) ** 2;
-    pointer.x = MathUtils.damp(pointer.x, floating || magnet ? pointerTarget.x : 0, 7, dt);
-    pointer.y = MathUtils.damp(pointer.y, floating || magnet ? pointerTarget.y : 0, 7, dt);
     const reveal = pose.reveal ?? 1;
     const assembled = MathUtils.smootherstep(reveal, .5, .88);
-    const x = pose.rotationX + (3 + Math.sin(time * .63)) * freedom * assembled + pointer.y * magnet;
-    const y = pose.rotationY + (-5 + Math.sin(time * .49) * 2) * freedom * assembled + pointer.x * magnet;
-    const z = pose.rotationZ + Math.sin(time * .55) * .5 * freedom * assembled;
+    // Smooth the complete pointer force, including its proximity envelope.
+    // Multiplying after damping creates a visible kick when the field ends.
+    pointer.x = MathUtils.damp(pointer.x, pointerTarget.x * magnet * assembled, 8, dt);
+    pointer.y = MathUtils.damp(pointer.y, pointerTarget.y * magnet * assembled, 8, dt);
+    const x = pose.rotationX + (3 + Math.sin(time * .63)) * freedom * assembled - pointer.y * 16;
+    const y = pose.rotationY + (-5 + Math.sin(time * .49) * 2) * freedom * assembled + pointer.x * 22;
+    const z = pose.rotationZ + Math.sin(time * .55) * .5 * freedom * assembled - pointer.x * 1.8;
     for (const [axis, value] of Object.entries({x, y, z})) attitude[axis] = MathUtils.damp(attitude[axis], value, 9, dt);
     // Keep scroll revolutions unwrapped and separate from the damped attitude.
     // 360 -> 0 damping would otherwise unwind the logo at every landing.
-    model.rotation.set(MathUtils.degToRad(attitude.x + interaction.tilt), MathUtils.degToRad(attitude.y + (pose.scrollTurn || 0) + interaction.turn), MathUtils.degToRad(attitude.z));
+    model.rotation.set(MathUtils.degToRad(attitude.x + interaction.tilt), MathUtils.degToRad(attitude.y + (pose.scrollTurn || 0) + dockRotation.rotation + interaction.turn), MathUtils.degToRad(attitude.z));
     model.position.y = Math.sin(time * .8) * 3 * freedom * assembled + interaction.lift;
     model.scale.setScalar(interaction.scale);
     for (const piece of model.children) {
@@ -183,10 +218,13 @@ export async function createLogoSculpture(host, ticker) {
     portrait.visible = reveal < .5;
     portrait.material.uniforms.uReveal.value = reveal;
     // This moves the reflected studio, not a white stripe painted over an SVG.
-    scene.environmentRotation.y = -.68 + MathUtils.smootherstep(reveal, .24, .96) * .78 + attitude.y * .012 + arrival * .12 + interaction.glow * .4;
-    scene.environmentRotation.z = Math.sin(time * .12) * .025 * freedom;
-    key.intensity = 1.65 + arrival * .2 + energy * .15 + interaction.glow * .5;
-    rim.intensity = 2.3 + arrival * .35 + energy * .3 + interaction.glow * .6;
+    scene.environmentRotation.x = pointer.y * .12;
+    scene.environmentRotation.y = -.68 + MathUtils.smootherstep(reveal, .24, .96) * .78 + attitude.y * .01 + pointer.x * .24 + arrival * .12 + interaction.glow * .4;
+    scene.environmentRotation.z = Math.sin(time * .12) * .025 * freedom - pointer.x * .035;
+    key.position.set(-500 + pointer.x * 360, 700 - pointer.y * 280, 900);
+    rim.position.set(200 - pointer.x * 260, -500 + pointer.y * 220, -100);
+    key.intensity = 1.5 + arrival * .2 + energy * .15 + interaction.glow * .5 + magnet * .12;
+    rim.intensity = 2.15 + arrival * .35 + energy * .3 + interaction.glow * .6;
     // Resizing clears the drawing buffer. Do it only on a frame that paints,
     // never from setPose between two throttled render ticks.
     resize();
@@ -218,7 +256,7 @@ export async function createLogoSculpture(host, ticker) {
     host.classList.remove('has-webgl');
   };
   const restored = () => { contextLost = false; needsFrame = true; };
-  const visibilityChanged = () => { needsFrame = true; };
+  const visibilityChanged = () => { lastFrame = ticker.time; needsFrame = true; };
   function dispose() {
     if (disposed) return;
     disposed = true;
@@ -267,15 +305,26 @@ export async function createLogoSculpture(host, ticker) {
       material.onBeforeCompile = shader => {
         shader.uniforms.uPortrait = {value: photo};
         shader.uniforms.uMaterialReveal = materialReveal;
-        shader.vertexShader = 'varying vec2 vPhotoUV;\n' + shader.vertexShader;
-        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n vPhotoUV = vec2(position.x / ${built.width.toFixed(3)} + .5, (position.y / ${(built.height * 1.05).toFixed(3)} + .5) * .84 + .112);`);
-        shader.fragmentShader = 'uniform sampler2D uPortrait; uniform float uMaterialReveal; varying vec2 vPhotoUV;\n' + portraitSampling + shader.fragmentShader;
+        shader.vertexShader = 'varying vec2 vPhotoUV; varying vec3 vCapBend; varying float vCapWeight;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+          vPhotoUV = vec2(position.x / ${built.width.toFixed(3)} + .5, (position.y / ${(built.height * 1.05).toFixed(3)} + .5) * .84 + .112);
+          vCapWeight = smoothstep(.6, .95, abs(normal.z));
+          vCapBend = normalMatrix * vec3(position.xy / ${built.width.toFixed(3)} * vec2(.72,.28), 0.0) * sign(normal.z);
+        `);
+        shader.fragmentShader = 'uniform sampler2D uPortrait; uniform float uMaterialReveal; varying vec2 vPhotoUV; varying vec3 vCapBend; varying float vCapWeight;\n' + portraitSampling + shader.fragmentShader;
         if (material === materials[0] || material === materials[4]) {
           // Very shallow machining across the metal cap bends the studio
           // reflection without changing the original contour or its dock.
           shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-            float cap = smoothstep(.6,.95,abs(normal.z));
-            normal = normalize(normal + vec3((vPhotoUV - .5) * vec2(1.8,.65),0.0) * cap);
+            normal = normalize(normal + vCapBend * vCapWeight);
+          `);
+          // A low-contrast brushed finish is filtered out when it becomes
+          // subpixel, keeping small travelling marks free of shimmer.
+          shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+            float brushPhase = vPhotoUV.y * 1100.0;
+            float brushVisibility = 1.0 - smoothstep(.5, 2.0, fwidth(brushPhase));
+            float brushed = sin(brushPhase) * brushVisibility * .014;
+            roughnessFactor = clamp(roughnessFactor + brushed * vCapWeight, .16, .5);
           `);
         }
         shader.fragmentShader = shader.fragmentShader.replace('#include <colorspace_fragment>', `#include <colorspace_fragment>
@@ -314,18 +363,20 @@ export async function createLogoSculpture(host, ticker) {
     camera.position.set(0, 0, half / Math.tan(MathUtils.degToRad(14)));
     camera.lookAt(0, 0, 0);
     const pmrem = new PMREMGenerator(renderer);
-    // A dark studio with separate softboxes gives the metal real highlight /
-    // shadow contrast. Perspective makes the reflection vary across each face.
+    // Broad softboxes establish readable faces; narrow strips and dark flags
+    // give the rounded bevels a crisp edge as the object or pointer turns.
     studio = new Scene();
     studio.background = new Color(0x080b10);
     const panels = [];
     for (const [x, y, z, w, h, color, strength] of [
-      [-4, 1, 2, 1.7, 6, 0xe9f1ff, 4.6],
-      [4, 1, 2, .8, 5, 0xffead3, 3.2],
+      [-4, 1, 2, 1.8, 6, 0xe9f1ff, 4.2],
+      [4, 1, 2, .65, 5, 0xffead3, 3.4],
       [-.5, 4, 0, 5, 1.2, 0xf3f5ff, 3],
-      [0, -2, -4, 5, .4, 0xc9d5df, 2],
-      [1.4, .5, 5, 1.4, 5, 0xe6ecf2, 2.4],
-      [-2, 0, 5, .35, 6, 0xf5f7ff, 5.4]
+      [0, -2, -4, 5, .45, 0xc9d5df, 2.4],
+      [1.4, .5, 5, 1.65, 5, 0xe6ecf2, 2.8],
+      [-2, 0, 5, .24, 6, 0xf5f7ff, 5.8],
+      [.15, 0, 4.9, .4, 6, 0x030507, 1],
+      [-1.3, -3, 1, 2.5, .22, 0xc8e9a9, 1.5]
     ]) {
       const panel = new Mesh(new BoxGeometry(w,h,.1), new MeshBasicMaterial({color: new Color(color).multiplyScalar(strength)}));
       panel.position.set(x,y,z); panel.lookAt(0,0,0); studio.add(panel); panels.push(panel);
@@ -335,7 +386,7 @@ export async function createLogoSculpture(host, ticker) {
     panels.forEach(panel => { panel.geometry.dispose(); panel.material.dispose(); studio.remove(panel); });
     studio.clear(); studio = null;
     pmrem.dispose();
-    key = new DirectionalLight(0xfff7e5, 1.65); key.position.set(-500, 700, 900);
+    key = new DirectionalLight(0xfff7e5, 1.5); key.position.set(-500, 700, 900);
     const fill = new DirectionalLight(0xc7defd, .75); fill.position.set(700, 100, 500);
     rim = new DirectionalLight(0xe1e8e8, 1.6); rim.position.set(200, -500, -100);
     scene.add(key, fill, rim, new HemisphereLight(0xe4edff, 0x222b14, .35));
@@ -370,11 +421,11 @@ export async function createLogoSculpture(host, ticker) {
         pose = next;
       },
       setPointer(x, y) {
-        const next = {x: x * 16, y: -y * 12};
+        const next = {x: MathUtils.clamp(x || 0, -1, 1), y: MathUtils.clamp(y || 0, -1, 1)};
         if (next.x === pointerTarget.x && next.y === pointerTarget.y) return;
         pointerTarget = next; needsFrame = true;
       },
-      setVisible(next) { visible = next; needsFrame = true; },
+      setVisible(next) { visible = next; lastFrame = ticker.time; needsFrame = true; },
       dispose
     };
   } catch (error) {

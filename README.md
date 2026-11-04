@@ -80,24 +80,28 @@ The floating emblem starts in the portrait, while the small header logo stays
 in place. The hero holds for a scroll-controlled reveal: a soft, contour-aware
 matte releases the photograph into the original logo. A and V lift and tilt in
 depth, then assemble while a directional material sweep resolves their photo
-surfaces into titanium, dark edges and a satin lime inlay. The GPU photograph
+surfaces into brushed titanium, graphite edges and a lacquered lime inlay. The GPU photograph
 matches the original crop, grayscale, brightness and contrast. The finished mark
 holds at portrait scale for a full scroll-controlled 360° turn before launch.
-The turn overlaps the end of the material reveal and settles before departure.
+The material reveal finishes before the turn, with a short pause to read the assembled mark.
+The turn settles before departure.
 Every contour comes directly from `assets/icons/logo.svg`; the geometry is not
 redrawn. The source's original corner brackets reappear late in the assembly.
 
 `logoFlightPose` blends measured heading positions into bounded, gently curved
 journeys, with short departure and approach windows even across long sections.
 Quintic easing matches the heading's movement at each join. On desktop, the
-assembled sculpture is magnetic within 380px of the cursor: a proximity-weighted
-pull is bounded to 46px horizontally and 34px vertically, with a damped 3D tilt.
+assembled sculpture is magnetic within 380px of the cursor. A critically damped
+spring limits heading movement to 14px horizontally and 10.5px vertically,
+with more freedom during travel (36px / 27px). Tilt responds to the displayed
+logo size independently of the larger magnetic field, so small mouse movements
+are clearly visible. The pointer also moves studio reflections and key/rim lights.
 The photograph stays anchored during its dissolve. Moving the cursor away returns
 the logo to its measured heading or footer socket; touch layouts omit attraction.
 A small idle drift runs only during travel.
 The footer settles up to 96px before the scroll limit, when its socket is visible.
-The mark shrinks during departure to 68% of its docking size (76% on phones),
-giving the work more room while it travels. It grows back to the measured socket
+The mark shrinks during departure to 80% of its docking size (84% on phones),
+remaining readable while it travels. It grows back to the measured socket
 during approach. Both ends match the position, scale and movement of their hold.
 Each journey completes another 360° turn around the vertical axis. The turns
 scrub backward with reverse scrolling, ease to rest at each socket and retain
@@ -110,12 +114,16 @@ stable pin spacers define the path and live socket rectangles align each hold.
 ResizeObserver and ScrollTrigger refresh events remeasure after layout changes.
 
 The self-hosted Three.js scene uses rounded, smoothly shaded bevels, a perspective camera and
-six softboxes against a dark studio environment, with studio strip reflections,
+eight studio panels, including a dark reflection flag, with strip reflections,
 soft lighting changes on arrival and dedicated finishes for both themes. It
 renders at up to 60 fps with a larger buffer for the portrait reveal and a small
 buffer during travel. Buffer changes happen immediately before drawing so they
 cannot introduce a cleared frame. Rendering pauses in hidden tabs and behind dialogs; the
-footer stops rendering after it settles. Desktop heading marks are 96–128px;
+logo continues turning in place at heading and footer docks, easing up to one
+revolution every 15 seconds. Nearby mouse interaction slows the turn for inspection.
+Its angle carries into the next scroll journey
+without a reset; returning to the portrait gently restores its aligned face.
+Desktop heading marks are 96–128px;
 phones use 72px and omit pointer attraction. The module loads only when motion
 is enabled. Shaders compile before the first GPU handoff to avoid a hitch during
 assembly. An unavailable or lost GPU shows the original vector and a simpler
