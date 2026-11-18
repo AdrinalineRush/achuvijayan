@@ -566,13 +566,50 @@
       if (loops.get(card) === entry) endLoop(card);
     });
   }
+  // Starting a YouTube player is heavy (its own process and several MB of script), so a card
+  // the visitor is flying past waits until the scroll slows. A card still on screen starts
+  // the moment it does; one that has already left never starts, so it is never built and torn
+  // down within a single flick. The poster stays visible either way.
+  let scrollSpeed = 0, speedY = scrollY, speedT = performance.now();
+  addEventListener('scroll', () => {
+    const now = performance.now(), dt = now - speedT;
+    if (dt < 16) return;
+    scrollSpeed = Math.abs(scrollY - speedY) / dt;
+    speedY = scrollY;
+    speedT = now;
+  }, {passive: true});
+  const scrollingFast = () => scrollSpeed > 1.2 && performance.now() - speedT < 140;
+  const settleTimers = new Map();
+  function startWhenSettled(card) {
+    clearTimeout(settleTimers.get(card));
+    settleTimers.delete(card);
+    if (!inView.has(card)) return;
+    if (!scrollingFast()) return startLoop(card);
+    settleTimers.set(card, setTimeout(() => startWhenSettled(card), 120));
+  }
   if (!reducedMotion && !navigator.connection?.saveData && 'IntersectionObserver' in window) {
     const loopWatch = new IntersectionObserver(entries => entries.forEach(({target, isIntersecting}) => {
       const card = target.closest('.spot');
-      if (isIntersecting) { inView.add(card); startLoop(card); }
-      else { inView.delete(card); endLoop(card); }
+      if (isIntersecting) { inView.add(card); startWhenSettled(card); }
+      else {
+        inView.delete(card);
+        clearTimeout(settleTimers.get(card));
+        settleTimers.delete(card);
+        endLoop(card);
+      }
     }), {threshold: .05});
     $$('.spot-player').forEach(player => loopWatch.observe(player));
+    // Fetch the YouTube player API a screen or two before the first card scrolls in, so it is
+    // not downloaded and evaluated in the middle of a scroll.
+    const firstSpot = $('.spot');
+    if (firstSpot && spots.some(c => parseVideo(c.video)?.type === 'youtube')) {
+      const warmYouTube = new IntersectionObserver(([entry]) => {
+        if (!entry.isIntersecting) return;
+        warmYouTube.disconnect();
+        loadYouTube().catch(() => {});
+      }, {rootMargin: '2400px 0px'});
+      warmYouTube.observe(firstSpot);
+    }
   }
 
   /* ---------- AI filmmaking: films on a phone and on cinema screens ---------- */
@@ -942,6 +979,14 @@
         const setFallbackTurn = gsap.quickSetter($('.signature-fallback'), 'rotationY', 'deg');
         const setSourceOpacity = gsap.quickSetter(source, 'opacity');
         const mark = $('.signature-mark');
+        // A custom property restyles the element's subtree even when rewritten with the same
+        // value, so only touch it when the value has actually changed.
+        const writtenVars = {};
+        const setVar = (name, value) => {
+          if (writtenVars[name] === value) return;
+          writtenVars[name] = value;
+          visual.style.setProperty(name, value);
+        };
         gsap.set(visual, {xPercent: -50, yPercent: -50, opacity: 1, force3D: false});
         logoSculpture?.setVisible(true);
         const render = (time = gsap.ticker.time) => {
@@ -978,10 +1023,10 @@
           logoSculpture?.setPointer(response.tiltX, response.tiltY);
           setX(x); setY(y); setScaleX(pose.scale); setScaleY(pose.scale); setOpacity(pose.opacity);
           if (visual.dataset.phase !== pose.phase) visual.dataset.phase = pose.phase;
-          visual.style.setProperty('--flight-energy', (pose.phase === 'chapter' ? .1 : pose.energy).toFixed(3));
-          visual.style.setProperty('--pointer-presence', response.magnet.toFixed(3));
-          visual.style.setProperty('--light-x', `${50 + response.tiltX * 22}%`);
-          visual.style.setProperty('--light-y', `${50 + response.tiltY * 22}%`);
+          setVar('--flight-energy', (pose.phase === 'chapter' ? .1 : pose.energy).toFixed(3));
+          setVar('--pointer-presence', response.magnet.toFixed(3));
+          setVar('--light-x', `${50 + response.tiltX * 22}%`);
+          setVar('--light-y', `${50 + response.tiltY * 22}%`);
           const interactive = pose.opacity > .9 && pose.reveal > .9 && pose.phase !== 'transit';
           mark.tabIndex = interactive ? 0 : -1;
           mark.style.pointerEvents = interactive ? 'auto' : 'none';
